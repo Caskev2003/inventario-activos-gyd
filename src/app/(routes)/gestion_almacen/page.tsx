@@ -1,37 +1,36 @@
-import { Refacciones } from './components/Refacciones'
-import { Quimicos } from './components/Quimicos'
+import { SucursalTapachula } from "./components/SucursalTapachula";
+import { SucursalHidalgo } from "./components/SucursalHidalgo";
+import { SucursalToscana } from "./components/SucursalToscana";
+import { SucursalTuxtla } from "./components/SucursalTuxtla";
 import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
-import { ButtonRegresar } from './components/ButtonRegresar';
+import { ButtonRegresar } from "./components/ButtonRegresar";
 
 export default async function Page() {
-
   const session = await auth();
-  
-    // Si no hay sesión, redirige al login
-    if (!session || !session.user) {
-      redirect("/login");
-    }
+
+  if (!session || !session.user) {
+    redirect("/login");
+  }
 
   return (
     <div className="relative bg-[#2b2b2b] min-h-screen overflow-hidden">
-
-      {/* Contenedor para centrar el título y los componentes en pantallas grandes */}
       <div className="mt-10 md:mt-28 lg:mt-42 mb-10 px-4">
         <h1 className="text-white text-xl md:text-3xl lg:text-4xl font-bold text-center">
-          GESTIÓN DE ALMACENES
+          GESTIÓN DE ACTIVOS FIJOS
         </h1>
       </div>
 
-      <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-20 lg:gap-36 w-full px-4">
-        <Refacciones />
-        <Quimicos />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-16 w-full px-6 md:px-10 place-items-start">
+        <SucursalTapachula />
+        <SucursalHidalgo />
+        <SucursalToscana />
+        <SucursalTuxtla />
       </div>
-       {/* Botón de regresar */}
-       <div className="flex justify-center mt-10">
-        <ButtonRegresar/>
+
+      <div className="flex justify-center mt-10">
+        <ButtonRegresar />
       </div>
     </div>
   );
 }
-

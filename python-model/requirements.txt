@@ -1,4 +1,0 @@
-pandas
-statsmodels
-npm install @headlessui/react
-npm install echarts

@@ -5,16 +5,30 @@ export async function GET() {
   const hace24Horas = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   try {
-    const notificaciones = await db.notificacion_refaccion.findMany({
+    const activos = await db.activo_fijo.findMany({
       where: {
-        creadaEn: {
+        existencia: 0,
+        updatedAt: {
           gte: hace24Horas,
         },
       },
       orderBy: {
-        creadaEn: "desc",
+        updatedAt: "desc",
+      },
+      select: {
+        id: true,
+        numeroControl: true,
+        descripcionActivo: true,
+        updatedAt: true,
       },
     });
+
+    const notificaciones = activos.map((item) => ({
+      id: item.id,
+      codigo: item.numeroControl,
+      descripcion: item.descripcionActivo,
+      creadaEn: item.updatedAt,
+    }));
 
     return NextResponse.json(notificaciones);
   } catch (error) {

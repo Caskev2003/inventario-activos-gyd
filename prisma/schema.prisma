@@ -8,136 +8,99 @@ datasource db {
 }
 
 model usuario {
-  id                    Int                     @id @default(autoincrement())
-  nombre                String?
-  correo                String                  @unique
-  imagen                String?
-  rol                   Rol
-  telefono              String?
-  password              String
-  emailVerified         DateTime?
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
-  movimientosReportados historial_movimientos[] @relation("UsuarioReportadoHistorial")
-  reportesL3            refacciones_l3[]        @relation("UsuarioReportadoRefacciones")
-  quimicosReportados    quimicos[]              @relation("UsuarioReportadoQuimicos")
-
-  passwordResetToken   String?
+  id                   Int                 @id @default(autoincrement())
+  nombre               String              @db.VarChar(100)
+  correo               String              @unique @db.VarChar(120)
+  imagen               String?             @db.VarChar(255)
+  rol                  Rol
+  telefono             String?             @db.VarChar(20)
+  password             String              @db.VarChar(255)
+  emailVerified        DateTime?
+  passwordResetToken   String?             @db.VarChar(255)
   passwordResetExpires DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  activosResponsable   activo_fijo[]       @relation("ResponsableActivo")
+  historialMovimientos historial_activos[] @relation("UsuarioHistorialActivo")
 }
 
-model refacciones_l3 {
-  codigo            Int           @id
-  descripcion       String        @db.VarChar(80)
-  noParte           String        @db.VarChar(50)
-  existenciaFisica  Int
-  existenciaSistema Int
-  diferencias       Int
-  proveedores       String        @db.VarChar(80)
-  cantidadEntrada   Int?
-  cantidadSalida    Int?
-  fechaIngreso      DateTime
-  movimiento        Movimiento
-  unidadMedidaId    Unidad_medida
-  ubicacionId       Int
-  ubicacion         ubicacion     @relation("UbicacionRefacciones", fields: [ubicacionId], references: [id])
-  reportadoPorId    Int
-  usuarioReportado  usuario       @relation("UsuarioReportadoRefacciones", fields: [reportadoPorId], references: [id])
+model activo_fijo {
+  id                    Int                 @id @default(autoincrement())
+  numeroControl         String              @unique @db.VarChar(50)
+  descripcionActivo     String              @map("descripcion_activo") @db.VarChar(150)
+  existencia            Int                 @default(1)
+  medidas               String?             @db.VarChar(100)
+  modeloMarca           String?             @map("modelo_marca") @db.VarChar(150)
+  numeroSerie           String?             @unique @map("numero_serie") @db.VarChar(100)
+  condicionesActivo     String?             @map("condiciones_activo") @db.VarChar(150)
+  observaciones         String?             @db.Text
 
-  @@index([reportadoPorId], map: "refacciones_l3_reportadoPorId_fkey")
-  @@index([ubicacionId], map: "refacciones_l3_ubicacionId_fkey")
+  sucursal              Sucursal
+  ubicacion             String?             @db.VarChar(150)
+
+  responsableDirectoId  Int?
+  responsableDirecto    usuario?            @relation("ResponsableActivo", fields: [responsableDirectoId], references: [id])
+
+  status                EstadoActivo        @default(ACTIVO)
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  historialMovimientos  historial_activos[] @relation("ActivoHistorial")
+
+  @@index([responsableDirectoId], map: "activo_fijo_responsableDirectoId_fkey")
+  @@index([sucursal])
 }
 
-model historial_movimientos {
-  id                      Int        @id @default(autoincrement())
-  codigo                  Int
-  descripcion             String
-  noParte                 String
-  movimiento              Movimiento
-  cantidad                Int
-  existenciaFisicaDespues Int
-  reportadoPorId          Int
-  fechaMovimiento         DateTime   @default(now())
+model historial_activos {
+  id               Int             @id @default(autoincrement())
+  activoId         Int
+  numeroControl    String          @db.VarChar(50)
+  descripcion      String?         @db.VarChar(150)
+  tipoMovimiento   TipoMovimiento
+  detalle          String?         @db.Text
+  sucursal         Sucursal
+  usuarioId        Int?
+  usuarioNombre    String?         @db.VarChar(100)
+  fecha            DateTime        @default(now())
 
-  // 🔹 Conservamos la columna original (VARCHAR) pero la renombramos solo en Prisma.
-  //    En la BD sigue llamándose `almacen` y sigue siendo VARCHAR(100).
-  almacenText             String     @db.VarChar(100) @map("almacen")
+  activo           activo_fijo     @relation("ActivoHistorial", fields: [activoId], references: [id], onDelete: Cascade)
+  usuario          usuario?        @relation("UsuarioHistorialActivo", fields: [usuarioId], references: [id])
 
-  // 🔹 Nueva columna ENUM, opcional al inicio para no fallar al crearla.
-  almacenEnum             Almacen?   @map("almacen_enum")
-
-  usuarioReportado        usuario    @relation("UsuarioReportadoHistorial", fields: [reportadoPorId], references: [id])
-
-  @@index([reportadoPorId], map: "historial_movimientos_reportadoPorId_fkey")
-}
-
-model ubicacion {
-  id          Int              @id @default(autoincrement())
-  rack        Int
-  posicion    String           @db.VarChar(20)
-  fila        String           @db.VarChar(20)
-  refacciones refacciones_l3[] @relation("UbicacionRefacciones")
-  quimicos    quimicos[]       @relation("UbicacionQuimicos")
+  @@index([activoId])
+  @@index([sucursal])
+  @@index([usuarioId])
+  @@index([tipoMovimiento])
+  @@index([fecha])
 }
 
 enum Rol {
   ADMINISTRADOR
-  SUPERVISOR_REFACCIONES
-  SUPERVISOR_QUIMICOS
-  DESPACHADOR
+  SUPERVISOR
+  CAPTURISTA
+  CONSULTA
 }
 
-enum Movimiento {
-  ENTRADA
-  SALIDA
-  NUEVO_INGRESO
-  EDITADO
-  ELIMINADO
+enum Sucursal {
+  TAPACHULA
+  TOSCANA
+  CIUDAD_HIDALGO
+  TUXTLA_GUTIERREZ
 }
 
-enum Unidad_medida {
-  KG
-  LTS
-  PZ
-  MTS
+enum EstadoActivo {
+  ACTIVO
+  INACTIVO
+  MANTENIMIENTO
+  BAJA
 }
 
-enum Almacen {
-  REFACCIONES
-  QUIMICOS
-}
-
-model notificacion_refaccion {
-  id            Int       @id @default(autoincrement())
-  codigo        Int
-  descripcion   String
-  creadaEn      DateTime  @default(now())
-}
-
-model quimicos {
-  id                Int           @id @default(autoincrement())
-  codigo            Int
-  descripcion       String        @db.VarChar(80)
-  noLote            String        @db.VarChar(50)
-  existenciaFisica  Int
-  existenciaSistema Int
-  diferencias       Int
-  proveedores       String        @db.VarChar(80)
-  cantidadEntrada   Int?
-  cantidadSalida    Int?
-  fechaIngreso      DateTime
-  fechaVencimiento  DateTime
-  diasDeVida        Int?
-  retenidos         Int
-  productoLiberado  String
-  movimiento        Movimiento
-  unidadMedidaId    Unidad_medida
-  ubicacionId       Int
-  ubicacion         ubicacion     @relation("UbicacionQuimicos", fields: [ubicacionId], references: [id])
-  reportadoPorId    Int
-  usuarioReportado  usuario       @relation("UsuarioReportadoQuimicos", fields: [reportadoPorId], references: [id])
-
-  @@unique([codigo, noLote], name: "quimicos_codigo_noLote_unique")
-  @@index([reportadoPorId], map: "quimicos_reportadoPorId_fkey")
-  @@index([ubicacionId], map: "quimicos_ubicacionId_fkey")
+enum TipoMovimiento {
+  ALTA
+  EDICION
+  BAJA
+  CAMBIO_STATUS
+  CAMBIO_UBICACION
+  TRANSFERENCIA
 }

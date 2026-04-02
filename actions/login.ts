@@ -1,55 +1,63 @@
-"use server"
+"use server";
 
-import { signIn } from "../auth"
-import { signInSchema } from "../src/lib/zod"
-import { z } from "zod"
-import { db } from "@/lib/db"
+import { db } from "@/lib/db";
+import bcrypt from "bcryptjs";
+import { signIn } from "../auth";
 
-export const login = async (values: z.infer<typeof signInSchema>) => {
-  const validatedFields = signInSchema.safeParse(values)
+interface LoginData {
+  correo: string;
+  password: string;
+}
 
-  if (!validatedFields.success) {
-    return { error: "Campos inválidos" }
+export async function login({ correo, password }: LoginData) {
+  if (!correo || !password) {
+    return { error: "Todos los campos son obligatorios" };
   }
 
-  const { correo, password } = validatedFields.data
-
-  // Buscamos el rol directamente en la DB
-  const user = await db.usuario.findUnique({ where: { correo } })
-  const rol = user?.rol
-
   try {
+    const user = await db.usuario.findUnique({
+      where: { correo },
+    });
+
+    if (!user) {
+      return { error: "Usuario no encontrado" };
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return { error: "Contraseña incorrecta" };
+    }
+
+    let redirectTo = "/";
+
+    switch (user.rol) {
+      case "ADMINISTRADOR":
+        redirectTo = "/";
+        break;
+
+      case "SUPERVISOR":
+      case "CAPTURISTA":
+      case "CONSULTA":
+        redirectTo = "/gestion_almacen";
+        break;
+
+      default:
+        return { error: "Rol no autorizado" };
+    }
+
     await signIn("credentials", {
       correo,
       password,
       redirect: false,
-    })
+    });
 
-    switch (rol) {
-      case "ADMINISTRADOR":
-        return { success: true, redirectTo: "/" }
-      case "SUPERVISOR_REFACCIONES":
-        return { success: true, redirectTo: "/supervisor_refacciones" }
-      case "SUPERVISOR_QUIMICOS":
-        return { success: true, redirectTo: "/supervisor_quimicos" }
-      case "DESPACHADOR":
-        return { success: true, redirectTo: "/despachador" }
-      default:
-        return { error: "Rol desconocido" }
-    }
+    return {
+      success: true,
+      redirectTo,
+    };
   } catch (error) {
-    if (error instanceof Error && error.name === "AuthError") {
-      // Manejo específico de errores de autenticación
-      const authError = error as { type?: string }
-      switch (authError.type) {
-        case "CredentialsSignin":
-          return { error: "Credenciales inválidas!" }
-        default:
-          return { error: "Error desconocido" }
-      }
-    }
-    
-    // Manejo de otros tipos de errores
-    return { error: "Ocurrió un error inesperado" }
+    console.error("Error en login:", error);
+    return { error: "Error interno del servidor" };
   }
 }

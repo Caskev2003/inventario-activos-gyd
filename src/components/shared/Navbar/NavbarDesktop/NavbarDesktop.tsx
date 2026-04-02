@@ -5,13 +5,14 @@ import { BellRing, CheckCircle, List } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { itemsNavbar } from "@/data/itemsNavbar";
 import Link from "next/link";
+import Image from "next/image";
 import { useScrollPosition } from "@/hooks/useScrollPosition";
 import { UserProfileCard } from "../../UserProfileCard";
 import { useSession } from "next-auth/react";
 
 interface Notificacion {
   id: number;
-  codigo: number;
+  codigo: number | string;
   descripcion: string;
   creadaEn: string;
 }
@@ -38,32 +39,45 @@ export function NavbarDesktop() {
           ? "/api/notificaciones/todas"
           : "/api/notificaciones/ultimas"
       );
+
+      if (!res.ok) {
+        throw new Error("No se pudieron cargar las notificaciones");
+      }
+
       const data = await res.json();
-      setNotificaciones(data);
+
+      if (Array.isArray(data)) {
+        setNotificaciones(data);
+      } else if (Array.isArray(data.notificaciones)) {
+        setNotificaciones(data.notificaciones);
+      } else {
+        setNotificaciones([]);
+      }
     } catch (error) {
       console.error("Error al cargar notificaciones:", error);
+      setNotificaciones([]);
     }
   };
 
   useEffect(() => {
+    if (status !== "authenticated") return;
+
     const yaMostro = sessionStorage.getItem("notificaciones_mostradas");
 
-    if (status === "authenticated") {
-      fetchNotificaciones();
-      const interval = setInterval(fetchNotificaciones, 5000);
+    fetchNotificaciones();
+    const interval = setInterval(fetchNotificaciones, 5000);
 
-      if (!yaMostro) {
-        setShowNotifications(true);
-        sessionStorage.setItem("notificaciones_mostradas", "true");
-      }
-
-      return () => clearInterval(interval);
+    if (!yaMostro) {
+      setShowNotifications(true);
+      sessionStorage.setItem("notificaciones_mostradas", "true");
     }
+
+    return () => clearInterval(interval);
   }, [verTodas, status]);
 
-  const notificacionesActivas = notificaciones.filter(
-    (n) => !leidos.includes(n.id)
-  );
+  const notificacionesActivas = Array.isArray(notificaciones)
+    ? notificaciones.filter((n) => !leidos.includes(n.id))
+    : [];
 
   const marcarComoLeido = (id: number) => {
     const nuevos = [...new Set([...leidos, id])];
@@ -96,15 +110,28 @@ export function NavbarDesktop() {
   return (
     <div
       className={cn(
-        "z-30 left-0 right-0 top-0 h-16 fixed w-full transition-all duration-300",
+        "fixed top-0 left-0 right-0 z-30 h-16 w-full transition-all duration-300",
         scrollPosition > 20 ? "bg-black" : "bg-transparent"
       )}
     >
-      <div className="px-[4%] mx-auto h-full bg-black relative">
-        <div className="flex gap-4 justify-between h-full items-center">
-          <div className="flex gap-2 items-center">
-            <p>INELAC</p>
-            <div className="ml-10 flex gap-4">
+      <div className="h-full bg-black px-2 md:px-4 lg:px-6">
+        <div className="flex h-full items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex h-14 w-[110px] items-center justify-center overflow-hidden"
+            >
+              <Image
+                src="/iconos/logo.jpeg"
+                alt="Distribución G&D"
+                width={110}
+                height={56}
+                className="h-full w-full object-contain"
+                priority
+              />
+            </Link>
+
+            <div className="ml-4 flex gap-4">
               {itemsNavbar.map((item) => (
                 <Link
                   key={item.name}
@@ -158,11 +185,12 @@ export function NavbarDesktop() {
                       notificacionesActivas.map((n) => (
                         <div
                           key={n.id}
-                          className="text-sm border-b border-gray-200 pb-2 mb-2 flex justify-between items-start"
+                          className="text-sm border-b border-gray-200 pb-2 mb-2 flex justify-between items-start gap-2"
                         >
                           <div>
-                            El producto <strong>{n.descripcion}</strong> con código{" "}
-                            <strong>{n.codigo}</strong> está en existencia 0.
+                            El producto <strong>{n.descripcion}</strong> con
+                            código <strong>{n.codigo}</strong> está en existencia
+                            0.
                           </div>
                           <button
                             onClick={() => marcarComoLeido(n.id)}
@@ -177,7 +205,7 @@ export function NavbarDesktop() {
                     <div className="mt-4 text-right">
                       <button
                         onClick={alternarVista}
-                        className="text-sm text-purple-700 hover:underline flex items-center gap-1"
+                        className="text-sm text-purple-700 hover:underline flex items-center gap-1 ml-auto"
                       >
                         <List className="w-4 h-4" />
                         {verTodas ? "Ver solo las últimas 24h" : "Ver todas"}
@@ -186,6 +214,7 @@ export function NavbarDesktop() {
                   </div>
                 )}
               </div>
+
               <UserProfileCard />
             </div>
           )}
