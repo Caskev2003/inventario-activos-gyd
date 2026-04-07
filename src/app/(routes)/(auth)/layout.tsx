@@ -9,7 +9,7 @@ export default function AuthLayout({
       {/* Imagen de fondo */}
       <div className="absolute inset-0 flex items-center justify-center">
         <Image
-          src="/iconos/FARMACIA G&D LOGO.PNG"
+          src="/iconos/farmacia-gyd-logo.png"
           alt="Logo"
           fill
           priority

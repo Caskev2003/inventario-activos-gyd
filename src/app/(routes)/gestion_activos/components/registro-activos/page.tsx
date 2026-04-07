@@ -6,13 +6,15 @@ type Sucursal =
   | "TAPACHULA"
   | "TOSCANA"
   | "CIUDAD_HIDALGO"
-  | "TUXTLA_GUTIERREZ";
+  | "TUXTLA_GUTIERREZ"
+  | "OFICINAS_ADMINISTRATIVAS";
 
 const SUCURSALES_VALIDAS: Sucursal[] = [
   "TAPACHULA",
   "TOSCANA",
   "CIUDAD_HIDALGO",
   "TUXTLA_GUTIERREZ",
+  "OFICINAS_ADMINISTRATIVAS",
 ];
 
 function esSucursalValida(valor?: string): valor is Sucursal {
@@ -29,6 +31,8 @@ function formatearSucursal(sucursal: Sucursal) {
       return "Ciudad Hidalgo";
     case "TUXTLA_GUTIERREZ":
       return "Tuxtla Gutiérrez";
+    case "OFICINAS_ADMINISTRATIVAS":
+      return "Oficinas Administrativas";
     default:
       return sucursal;
   }

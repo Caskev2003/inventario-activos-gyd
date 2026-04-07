@@ -5,7 +5,8 @@ type Sucursal =
   | "TAPACHULA"
   | "TOSCANA"
   | "CIUDAD_HIDALGO"
-  | "TUXTLA_GUTIERREZ";
+  | "TUXTLA_GUTIERREZ"
+  | "OFICINAS_ADMINISTRATIVAS";
 
 type EstadoActivo =
   | "ACTIVO"
@@ -26,6 +27,7 @@ const SUCURSALES_VALIDAS: Sucursal[] = [
   "TOSCANA",
   "CIUDAD_HIDALGO",
   "TUXTLA_GUTIERREZ",
+  "OFICINAS_ADMINISTRATIVAS"
 ];
 
 const ESTADOS_VALIDOS: EstadoActivo[] = [
@@ -97,9 +99,7 @@ export async function GET(request: NextRequest) {
       }
 
       const activo = await db.activo_fijo.findUnique({
-        where: {
-          id,
-        },
+        where: { id },
         include: {
           responsableDirecto: {
             select: {
@@ -129,11 +129,7 @@ export async function GET(request: NextRequest) {
     }
 
     const activos = await db.activo_fijo.findMany({
-      where: sucursal
-        ? {
-            sucursal,
-          }
-        : undefined,
+      where: sucursal ? { sucursal } : undefined,
       include: {
         responsableDirecto: {
           select: {
@@ -166,15 +162,16 @@ export async function POST(request: NextRequest) {
     const descripcionActivo = String(body.descripcionActivo ?? "").trim();
     const existencia = Number(body.existencia);
     const medidas = body.medidas ? String(body.medidas).trim() : null;
-    const modeloMarca = body.modeloMarca
-      ? String(body.modeloMarca).trim()
-      : null;
+    const modeloMarca = body.modeloMarca ? String(body.modeloMarca).trim() : null;
     const numeroSerie = body.numeroSerie ? String(body.numeroSerie).trim() : null;
     const condicionesActivo = body.condicionesActivo
       ? String(body.condicionesActivo).trim()
       : null;
     const observaciones = body.observaciones
       ? String(body.observaciones).trim()
+      : null;
+    const imagenActivo = body.imagenActivo
+      ? String(body.imagenActivo).trim()
       : null;
     const sucursalBody = body.sucursal ? String(body.sucursal).trim() : null;
     const ubicacion = body.ubicacion ? String(body.ubicacion).trim() : null;
@@ -227,9 +224,7 @@ export async function POST(request: NextRequest) {
     const status: EstadoActivo = statusBody;
 
     const responsableExiste = await db.usuario.findUnique({
-      where: {
-        id: responsableDirectoId,
-      },
+      where: { id: responsableDirectoId },
     });
 
     if (!responsableExiste) {
@@ -240,9 +235,7 @@ export async function POST(request: NextRequest) {
     }
 
     const numeroControlExiste = await db.activo_fijo.findUnique({
-      where: {
-        numeroControl,
-      },
+      where: { numeroControl },
     });
 
     if (numeroControlExiste) {
@@ -254,9 +247,7 @@ export async function POST(request: NextRequest) {
 
     if (numeroSerie) {
       const numeroSerieExiste = await db.activo_fijo.findFirst({
-        where: {
-          numeroSerie,
-        },
+        where: { numeroSerie },
       });
 
       if (numeroSerieExiste) {
@@ -277,6 +268,7 @@ export async function POST(request: NextRequest) {
         numeroSerie,
         condicionesActivo,
         observaciones,
+        imagenActivo,
         sucursal,
         ubicacion,
         responsableDirectoId,
@@ -298,7 +290,9 @@ export async function POST(request: NextRequest) {
       numeroControl: nuevoActivo.numeroControl,
       descripcion: nuevoActivo.descripcionActivo,
       tipoMovimiento: "ALTA",
-      detalle: `Se registró el activo con status ${nuevoActivo.status}${nuevoActivo.ubicacion ? ` en ubicación ${nuevoActivo.ubicacion}` : ""}`,
+      detalle: `Se registró el activo con status ${nuevoActivo.status}${
+        nuevoActivo.ubicacion ? ` en ubicación ${nuevoActivo.ubicacion}` : ""
+      }${nuevoActivo.imagenActivo ? " con imagen adjunta" : ""}`,
       sucursal: nuevoActivo.sucursal as Sucursal,
       usuarioId: responsableDirectoId,
       usuarioNombre: responsableExiste.nombre,
@@ -329,9 +323,7 @@ export async function PUT(request: NextRequest) {
     const descripcionActivo = String(body.descripcionActivo ?? "").trim();
     const existencia = Number(body.existencia);
     const medidas = body.medidas ? String(body.medidas).trim() : null;
-    const modeloMarca = body.modeloMarca
-      ? String(body.modeloMarca).trim()
-      : null;
+    const modeloMarca = body.modeloMarca ? String(body.modeloMarca).trim() : null;
     const numeroSerie = body.numeroSerie ? String(body.numeroSerie).trim() : null;
     const condicionesActivo = body.condicionesActivo
       ? String(body.condicionesActivo).trim()
@@ -339,6 +331,10 @@ export async function PUT(request: NextRequest) {
     const observaciones = body.observaciones
       ? String(body.observaciones).trim()
       : null;
+    const imagenActivo =
+      body.imagenActivo !== undefined && body.imagenActivo !== null
+        ? String(body.imagenActivo).trim()
+        : null;
     const sucursalBody = body.sucursal ? String(body.sucursal).trim() : null;
     const ubicacion = body.ubicacion ? String(body.ubicacion).trim() : null;
     const responsableDirectoId = Number(body.responsableDirectoId);
@@ -417,9 +413,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const responsableExiste = await db.usuario.findUnique({
-      where: {
-        id: responsableDirectoId,
-      },
+      where: { id: responsableDirectoId },
     });
 
     if (!responsableExiste) {
@@ -432,9 +426,7 @@ export async function PUT(request: NextRequest) {
     const numeroControlDuplicado = await db.activo_fijo.findFirst({
       where: {
         numeroControl,
-        NOT: {
-          id,
-        },
+        NOT: { id },
       },
     });
 
@@ -449,9 +441,7 @@ export async function PUT(request: NextRequest) {
       const numeroSerieDuplicado = await db.activo_fijo.findFirst({
         where: {
           numeroSerie,
-          NOT: {
-            id,
-          },
+          NOT: { id },
         },
       });
 
@@ -482,19 +472,29 @@ export async function PUT(request: NextRequest) {
     }
 
     if ((activoExiste.modeloMarca ?? "") !== (modeloMarca ?? "")) {
-      cambios.push(`Modelo/Marca: ${activoExiste.modeloMarca ?? "Sin dato"} → ${modeloMarca ?? "Sin dato"}`);
+      cambios.push(
+        `Modelo/Marca: ${activoExiste.modeloMarca ?? "Sin dato"} → ${modeloMarca ?? "Sin dato"}`
+      );
     }
 
     if ((activoExiste.numeroSerie ?? "") !== (numeroSerie ?? "")) {
-      cambios.push(`Número de serie: ${activoExiste.numeroSerie ?? "Sin dato"} → ${numeroSerie ?? "Sin dato"}`);
+      cambios.push(
+        `Número de serie: ${activoExiste.numeroSerie ?? "Sin dato"} → ${numeroSerie ?? "Sin dato"}`
+      );
     }
 
     if ((activoExiste.condicionesActivo ?? "") !== (condicionesActivo ?? "")) {
-      cambios.push(`Condiciones: ${activoExiste.condicionesActivo ?? "Sin dato"} → ${condicionesActivo ?? "Sin dato"}`);
+      cambios.push(
+        `Condiciones: ${activoExiste.condicionesActivo ?? "Sin dato"} → ${condicionesActivo ?? "Sin dato"}`
+      );
     }
 
     if ((activoExiste.observaciones ?? "") !== (observaciones ?? "")) {
-      cambios.push(`Observaciones actualizadas`);
+      cambios.push("Observaciones actualizadas");
+    }
+
+    if ((activoExiste.imagenActivo ?? "") !== (imagenActivo ?? "")) {
+      cambios.push("Imagen actualizada");
     }
 
     if (activoExiste.sucursal !== sucursal) {
@@ -502,7 +502,9 @@ export async function PUT(request: NextRequest) {
     }
 
     if ((activoExiste.ubicacion ?? "") !== (ubicacion ?? "")) {
-      cambios.push(`Ubicación: ${activoExiste.ubicacion ?? "Sin ubicación"} → ${ubicacion ?? "Sin ubicación"}`);
+      cambios.push(
+        `Ubicación: ${activoExiste.ubicacion ?? "Sin ubicación"} → ${ubicacion ?? "Sin ubicación"}`
+      );
     }
 
     if (activoExiste.status !== status) {
@@ -526,6 +528,7 @@ export async function PUT(request: NextRequest) {
         numeroSerie,
         condicionesActivo,
         observaciones,
+        imagenActivo,
         sucursal,
         ubicacion,
         responsableDirectoId,
@@ -605,9 +608,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const activo = await db.activo_fijo.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
       include: {
         responsableDirecto: {
           select: {
@@ -638,16 +639,16 @@ export async function DELETE(request: NextRequest) {
       numeroControl: activo.numeroControl,
       descripcion: activo.descripcionActivo,
       tipoMovimiento: "BAJA",
-      detalle: `Se eliminó el activo con status ${activo.status}${activo.ubicacion ? ` ubicado en ${activo.ubicacion}` : ""}`,
+      detalle: `Se eliminó el activo con status ${activo.status}${
+        activo.ubicacion ? ` ubicado en ${activo.ubicacion}` : ""
+      }`,
       sucursal: activo.sucursal as Sucursal,
       usuarioId: activo.responsableDirectoId ?? null,
       usuarioNombre: activo.responsableDirecto?.nombre ?? null,
     });
 
     await db.activo_fijo.delete({
-      where: {
-        id,
-      },
+      where: { id },
     });
 
     return NextResponse.json({

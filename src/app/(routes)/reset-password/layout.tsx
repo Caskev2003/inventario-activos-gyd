@@ -6,15 +6,17 @@ export default function ResettLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="relative min-h-screen">
-      {/* Fondo */}
-      <Image
-        src="/iconos/inelac_fondo_login.jpg"
-        alt=""
-        fill
-        priority
-        style={{ objectFit: 'cover' }}
-        sizes="100vw"
-      />
+       {/* Logo centrado */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-10">
+              <Image
+                src="/iconos/farmacia-gyd-logo.png"
+                alt="Logo G&D"
+                width={400}
+                height={400}
+                className="object-contain"
+                priority
+              />
+            </div>
       {/* Velo oscuro (no afecta al contenido) */}
       <div className="absolute inset-0 bg-black/60" />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -14,7 +14,13 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { Trash2, FileSpreadsheet, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Trash2, FileSpreadsheet, Pencil, Search, Eye } from "lucide-react";
 import type { Activo } from "./TablaActivos.types";
 import { ModalEditarActivo } from "../modal-editar-activo";
 
@@ -22,7 +28,8 @@ type Sucursal =
   | "TAPACHULA"
   | "TOSCANA"
   | "CIUDAD_HIDALGO"
-  | "TUXTLA_GUTIERREZ";
+  | "TUXTLA_GUTIERREZ"
+  | "OFICINAS_ADMINISTRATIVAS";
 
 interface Props {
   refrescar?: number;
@@ -35,6 +42,7 @@ const SUCURSALES_VALIDAS: Sucursal[] = [
   "TOSCANA",
   "CIUDAD_HIDALGO",
   "TUXTLA_GUTIERREZ",
+  "OFICINAS_ADMINISTRATIVAS",
 ];
 
 function esSucursalValida(valor: string): valor is Sucursal {
@@ -55,15 +63,35 @@ export function TablaActivos({
   const [activoSeleccionado, setActivoSeleccionado] = useState<Activo | null>(null);
   const [activoEditar, setActivoEditar] = useState<Activo | null>(null);
   const [openEditar, setOpenEditar] = useState(false);
+  const [openImagen, setOpenImagen] = useState(false);
+  const [activoVerImagen, setActivoVerImagen] = useState<Activo | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [busquedaLocal, setBusquedaLocal] = useState("");
+
+  const inputBusquedaRef = useRef<HTMLInputElement | null>(null);
 
   const itemsPerPage = 10;
 
   const abrirModalEditar = (item: Activo) => {
     setActivoEditar(item);
     setOpenEditar(true);
+  };
+
+  const abrirModalImagen = (item: Activo) => {
+    setActivoVerImagen(item);
+    setOpenImagen(true);
+  };
+
+  const normalizarBusqueda = (valor: string) => {
+    return valor
+      .replace(/\r/g, "")
+      .replace(/\n/g, "")
+      .replace(/\t/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
   };
 
   const fetchActivos = async () => {
@@ -132,28 +160,58 @@ export function TablaActivos({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [busqueda, sucursalFiltro]);
+  }, [busqueda, busquedaLocal, sucursalFiltro]);
+
+  useEffect(() => {
+    inputBusquedaRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    inputBusquedaRef.current?.focus();
+  }, [activos.length]);
+
+  const textoBusqueda = normalizarBusqueda(busquedaLocal || busqueda);
+
+  const manejarEnterBusqueda = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      setCurrentPage(1);
+
+      setTimeout(() => {
+        inputBusquedaRef.current?.select();
+      }, 50);
+    }
+  };
 
   const datosAMostrar = useMemo(() => {
     let datos = [...activos];
 
-    if (busqueda.trim() !== "") {
-      const q = busqueda.toLowerCase();
+    if (textoBusqueda !== "") {
+      const coincidenciasExactas = datos.filter(
+        (item) => normalizarBusqueda(item.numeroControl) === textoBusqueda
+      );
+
+      if (coincidenciasExactas.length > 0) {
+        return coincidenciasExactas;
+      }
 
       datos = datos.filter((item) => {
         return (
-          item.numeroControl.toLowerCase().includes(q) ||
-          item.descripcionActivo.toLowerCase().includes(q) ||
-          (item.numeroSerie ?? "").toLowerCase().includes(q) ||
-          (item.modeloMarca ?? "").toLowerCase().includes(q) ||
-          (item.ubicacion ?? "").toLowerCase().includes(q) ||
-          (item.responsableDirecto?.nombre ?? "").toLowerCase().includes(q)
+          normalizarBusqueda(item.numeroControl).includes(textoBusqueda) ||
+          normalizarBusqueda(item.descripcionActivo ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.numeroSerie ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.modeloMarca ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.ubicacion ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.responsableDirecto?.nombre ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.status ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.condicionesActivo ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.observaciones ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.sucursal ?? "").includes(textoBusqueda)
         );
       });
     }
 
     return datos;
-  }, [activos, busqueda]);
+  }, [activos, textoBusqueda]);
 
   const totalPages = Math.max(1, Math.ceil(datosAMostrar.length / itemsPerPage));
 
@@ -319,33 +377,69 @@ export function TablaActivos({
 
   return (
     <div className="overflow-x-auto mt-6">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-lg font-bold text-white">
-          Activos fijos
-          {sucursalFiltro && esSucursalValida(sucursalFiltro) && (
-            <span className="ml-2 text-sm font-medium text-blue-300">
-              ({formatearSucursal(sucursalFiltro)})
-            </span>
-          )}
-        </h3>
+      <div className="mb-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-lg font-bold text-white">
+            Activos fijos
+            {sucursalFiltro && esSucursalValida(sucursalFiltro) && (
+              <span className="ml-2 text-sm font-medium text-blue-300">
+                ({formatearSucursal(sucursalFiltro)})
+              </span>
+            )}
+          </h3>
 
-        <button
-          onClick={exportarExcel}
-          disabled={exporting || !datosAMostrar.length}
-          className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-md transition ${
-            exporting || !datosAMostrar.length
-              ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-              : "bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 text-white hover:brightness-110 active:scale-[0.98]"
-          }`}
-          title={
-            !datosAMostrar.length ? "No hay datos para exportar" : "Exportar a Excel"
-          }
-        >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/20 backdrop-blur-sm">
-            <FileSpreadsheet className="h-4 w-4" />
-          </span>
-          {exporting ? "Exportando..." : "Exportar Excel"}
-        </button>
+          <button
+            onClick={exportarExcel}
+            disabled={exporting || !datosAMostrar.length}
+            className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-md transition ${
+              exporting || !datosAMostrar.length
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 text-white hover:brightness-110 active:scale-[0.98]"
+            }`}
+            title={
+              !datosAMostrar.length ? "No hay datos para exportar" : "Exportar a Excel"
+            }
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/20 backdrop-blur-sm">
+              <FileSpreadsheet className="h-4 w-4" />
+            </span>
+            {exporting ? "Exportando..." : "Exportar Excel"}
+          </button>
+        </div>
+
+        <div className="flex justify-center">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              ref={inputBusquedaRef}
+              type="text"
+              placeholder="Escanea o busca por control, descripción, serie, modelo, ubicación..."
+              value={busquedaLocal}
+              onChange={(e) => setBusquedaLocal(e.target.value)}
+              onKeyDown={manejarEnterBusqueda}
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+            />
+            {busquedaLocal && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBusquedaLocal("");
+                  setTimeout(() => {
+                    inputBusquedaRef.current?.focus();
+                  }, 50);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-300 hover:text-white"
+                title="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {totalPages > 1 && (
@@ -354,8 +448,7 @@ export function TablaActivos({
             Mostrando registros{" "}
             <span className="font-bold text-blue-100">
               {datosAMostrar.length === 0 ? 0 : indexOfFirstItem + 1}
-              -
-              {Math.min(indexOfLastItem, datosAMostrar.length)}
+              -{Math.min(indexOfLastItem, datosAMostrar.length)}
             </span>{" "}
             de <span className="font-bold">{datosAMostrar.length}</span>
           </div>
@@ -426,6 +519,7 @@ export function TablaActivos({
               <th className="p-3 text-left">Modelo/Marca</th>
               <th className="p-3 text-left">Serie</th>
               <th className="p-3 text-left">Condiciones</th>
+              <th className="p-3 text-left">Observaciones</th>
               <th className="p-3 text-left">Sucursal</th>
               <th className="p-3 text-left">Ubicación</th>
               <th className="p-3 text-left">Responsable</th>
@@ -439,7 +533,7 @@ export function TablaActivos({
             {loading && (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={14}
                   className="text-center py-4 text-white bg-[#424242] font-semibold"
                 >
                   Cargando activos...
@@ -450,7 +544,7 @@ export function TablaActivos({
             {!loading && currentItems.length === 0 && (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={14}
                   className="text-center py-4 text-red-500 bg-[#424242] font-semibold"
                 >
                   No hay activos registrados.
@@ -471,6 +565,7 @@ export function TablaActivos({
                   <td className="p-2">{item.modeloMarca || "-"}</td>
                   <td className="p-2">{item.numeroSerie || "-"}</td>
                   <td className="p-2">{item.condicionesActivo || "-"}</td>
+                  <td className="p-2">{item.observaciones || "-"}</td>
                   <td className="p-2">{formatearSucursal(item.sucursal)}</td>
                   <td className="p-2">{item.ubicacion || "-"}</td>
                   <td className="p-2">
@@ -485,7 +580,15 @@ export function TablaActivos({
                       ? new Date(item.createdAt).toLocaleDateString()
                       : "-"}
                   </td>
-                  <td className="p-2 text-center">
+                  <td className="p-2 text-center whitespace-nowrap">
+                    <button
+                      onClick={() => abrirModalImagen(item)}
+                      className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white px-3 py-1 rounded-[5px] hover:bg-emerald-700 transition mr-2"
+                      title="Ver imagen"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+
                     <button
                       onClick={() => abrirModalEditar(item)}
                       className="bg-gradient-to-b from-blue-600 to-blue-800 text-white px-3 py-1 rounded-[5px] hover:bg-blue-700 transition mr-2"
@@ -552,6 +655,30 @@ export function TablaActivos({
         activo={activoEditar}
         onSuccess={fetchActivos}
       />
+
+      <Dialog open={openImagen} onOpenChange={setOpenImagen}>
+        <DialogContent className="max-w-3xl bg-[#2f2f2f] text-white border border-gray-700">
+          <DialogHeader>
+            <DialogTitle>
+              Imagen del activo: {activoVerImagen?.descripcionActivo || "Sin descripción"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center justify-center">
+            {activoVerImagen?.imagenActivo ? (
+              <img
+                src={`/api/activos/imagen/${encodeURIComponent(activoVerImagen.imagenActivo)}`}
+                alt={activoVerImagen.descripcionActivo}
+                className="max-h-[70vh] w-auto rounded-lg border border-gray-600 object-contain"
+              />
+            ) : (
+              <div className="py-10 text-center text-gray-300">
+                Este activo no tiene imagen registrada.
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

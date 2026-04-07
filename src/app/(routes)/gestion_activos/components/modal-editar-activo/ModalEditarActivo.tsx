@@ -27,6 +27,8 @@ export function ModalEditarActivo({
   onSuccess,
 }: Props) {
   const [loading, setLoading] = useState(false);
+  const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
+  const [previewImagen, setPreviewImagen] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     id: 0,
@@ -38,6 +40,7 @@ export function ModalEditarActivo({
     numeroSerie: "",
     condicionesActivo: "",
     observaciones: "",
+    imagenActivo: "",
     sucursal: "TAPACHULA",
     ubicacion: "",
     responsableDirectoId: 0,
@@ -56,13 +59,25 @@ export function ModalEditarActivo({
         numeroSerie: activo.numeroSerie ?? "",
         condicionesActivo: activo.condicionesActivo ?? "",
         observaciones: activo.observaciones ?? "",
+        imagenActivo: activo.imagenActivo ?? "",
         sucursal: activo.sucursal ?? "TAPACHULA",
         ubicacion: activo.ubicacion ?? "",
         responsableDirectoId: Number(activo.responsableDirectoId ?? 0),
         status: activo.status ?? "ACTIVO",
       });
+
+      setArchivoImagen(null);
+      setPreviewImagen(null);
     }
   }, [activo]);
+
+  useEffect(() => {
+    return () => {
+      if (previewImagen) {
+        URL.revokeObjectURL(previewImagen);
+      }
+    };
+  }, [previewImagen]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -71,17 +86,62 @@ export function ModalEditarActivo({
 
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "existencia" || name === "responsableDirectoId"
-        ? Number(value)
-        : value,
+      [name]:
+        name === "existencia" || name === "responsableDirectoId"
+          ? Number(value)
+          : value,
     }));
+  };
+
+  const handleSeleccionImagen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+
+    if (previewImagen) {
+      URL.revokeObjectURL(previewImagen);
+    }
+
+    setArchivoImagen(file);
+
+    if (file) {
+      const previewUrl = URL.createObjectURL(file);
+      setPreviewImagen(previewUrl);
+    } else {
+      setPreviewImagen(null);
+    }
+  };
+
+  const subirImagen = async (file: File) => {
+    const formDataUpload = new FormData();
+    formDataUpload.append("file", file);
+
+    const res = await fetch("/api/activos/upload", {
+      method: "POST",
+      body: formDataUpload,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data?.error || "No se pudo subir la imagen");
+    }
+
+    return data.fileName as string;
   };
 
   const handleSubmit = async () => {
     try {
       setLoading(true);
 
-      await axios.put("/api/activos", formData);
+      let imagenActivo = formData.imagenActivo || null;
+
+      if (archivoImagen) {
+        imagenActivo = await subirImagen(archivoImagen);
+      }
+
+      await axios.put("/api/activos", {
+        ...formData,
+        imagenActivo,
+      });
 
       toast({
         title: "Activo actualizado",
@@ -97,6 +157,7 @@ export function ModalEditarActivo({
         description:
           error?.response?.data?.error ||
           error?.response?.data?.message ||
+          error?.message ||
           "No se pudo actualizar el activo.",
         variant: "destructive",
       });
@@ -238,6 +299,49 @@ export function ModalEditarActivo({
               rows={4}
               className="w-full rounded-md border bg-white px-3 py-2 text-black resize-none"
             />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="text-sm mb-1 block">Imagen del activo</label>
+            <Input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              onChange={handleSeleccionImagen}
+              className="bg-white text-black file:mr-4 file:rounded-md file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-white hover:file:bg-blue-700"
+              disabled={loading}
+            />
+
+            <div className="mt-4 flex flex-col md:flex-row gap-6">
+              <div>
+                <p className="mb-2 text-sm text-gray-300">Imagen actual:</p>
+                {formData.imagenActivo ? (
+                  <img
+                    src={`/api/activos/imagen/${formData.imagenActivo}`}
+                    alt={formData.descripcionActivo}
+                    className="h-36 w-36 rounded-lg border border-gray-600 object-cover bg-white"
+                  />
+                ) : (
+                  <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-sm text-gray-300">
+                    Sin imagen
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm text-gray-300">Nueva vista previa:</p>
+                {previewImagen ? (
+                  <img
+                    src={previewImagen}
+                    alt="Nueva vista previa"
+                    className="h-36 w-36 rounded-lg border border-gray-600 object-cover bg-white"
+                  />
+                ) : (
+                  <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-sm text-gray-300">
+                    No has seleccionado una nueva imagen
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

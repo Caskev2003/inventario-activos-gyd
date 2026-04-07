@@ -18,18 +18,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import BarcodePreview from "@/components/barcode/BarcodePreview";
 
 type Sucursal =
   | "TAPACHULA"
   | "CIUDAD_HIDALGO"
   | "TOSCANA"
-  | "TUXTLA_GUTIERREZ";
+  | "TUXTLA_GUTIERREZ"
+  | "OFICINAS_ADMINISTRATIVAS";
 
 const SUCURSALES_VALIDAS: Sucursal[] = [
   "TAPACHULA",
   "CIUDAD_HIDALGO",
   "TOSCANA",
   "TUXTLA_GUTIERREZ",
+  "OFICINAS_ADMINISTRATIVAS",
 ];
 
 function esSucursalValida(valor: string | null): valor is Sucursal {
@@ -46,6 +49,8 @@ function formatearSucursal(sucursal: Sucursal) {
       return "Toscana";
     case "TUXTLA_GUTIERREZ":
       return "Tuxtla Gutiérrez";
+    case "OFICINAS_ADMINISTRATIVAS":
+      return "Oficinas Administrativas";
     default:
       return sucursal;
   }
@@ -55,7 +60,11 @@ export function ActivosForm() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
+  const [previewImagen, setPreviewImagen] = useState<string | null>(null);
+  const [codigoBarras, setCodigoBarras] = useState("");
 
   const sucursalDesdeUrl = searchParams.get("sucursal");
 
@@ -93,14 +102,139 @@ export function ActivosForm() {
     }
   }, [session?.user?.id, form]);
 
+  useEffect(() => {
+    return () => {
+      if (previewImagen) {
+        URL.revokeObjectURL(previewImagen);
+      }
+    };
+  }, [previewImagen]);
+
+  // Sincroniza automáticamente el barcode con numeroControl
+  useEffect(() => {
+    const subscription = form.watch((values, info) => {
+      if (info.name === "numeroControl") {
+        setCodigoBarras((values.numeroControl ?? "").toUpperCase());
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  const handleSeleccionImagen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+
+    if (previewImagen) {
+      URL.revokeObjectURL(previewImagen);
+    }
+
+    setArchivoImagen(file);
+
+    if (file) {
+      const previewUrl = URL.createObjectURL(file);
+      setPreviewImagen(previewUrl);
+    } else {
+      setPreviewImagen(null);
+    }
+  };
+
+  const subirImagen = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/activos/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data?.error || "No se pudo subir la imagen");
+    }
+
+    return data.fileName as string;
+  };
+
+  const imprimirEtiqueta = () => {
+    const contenido = document.getElementById("area-etiqueta");
+    if (!contenido || !codigoBarras.trim()) return;
+
+    const ventana = window.open("", "_blank", "width=420,height=320");
+    if (!ventana) return;
+
+    ventana.document.write(`
+      <html>
+        <head>
+          <title>Etiqueta código de barras</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              background: #ffffff;
+              font-family: Arial, sans-serif;
+            }
+
+            .etiqueta {
+              width: 320px;
+              text-align: center;
+              background: #ffffff;
+              padding: 12px;
+              border-radius: 10px;
+            }
+
+            .etiqueta svg {
+              width: 100%;
+              height: auto;
+            }
+
+            .etiqueta p {
+              margin-top: 8px;
+              font-size: 18px;
+              font-weight: bold;
+              letter-spacing: 1px;
+              color: #000000;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="etiqueta">
+            ${contenido.innerHTML}
+          </div>
+          <script>
+            window.onload = function () {
+              window.print();
+              window.close();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+
+    ventana.document.close();
+  };
+
   const onSubmit = async (values: ActivosFormValues) => {
     try {
       setIsSubmitting(true);
 
-      const payload: ActivosFormValues = {
+      let imagenActivo: string | null = null;
+
+      if (archivoImagen) {
+        imagenActivo = await subirImagen(archivoImagen);
+      }
+
+      const payload = {
         ...values,
+        numeroControl: values.numeroControl.toUpperCase(),
         sucursal: sucursalActual,
-        responsableDirectoId: Number(session?.user?.id ?? values.responsableDirectoId),
+        responsableDirectoId: Number(
+          session?.user?.id ?? values.responsableDirectoId
+        ),
+        imagenActivo,
       };
 
       await axios.post("/api/activos", payload);
@@ -124,6 +258,14 @@ export function ActivosForm() {
         status: "ACTIVO",
       });
 
+      if (previewImagen) {
+        URL.revokeObjectURL(previewImagen);
+      }
+
+      setArchivoImagen(null);
+      setPreviewImagen(null);
+      setCodigoBarras("");
+
       router.push(`/gestion_activos?sucursal=${sucursalActual}`);
       router.refresh();
     } catch (error: any) {
@@ -133,6 +275,7 @@ export function ActivosForm() {
         description:
           error?.response?.data?.error ||
           error?.response?.data?.message ||
+          error?.message ||
           "No se pudo registrar el activo",
         variant: "destructive",
       });
@@ -165,6 +308,8 @@ export function ActivosForm() {
               <FormControl>
                 <Input
                   {...field}
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                   className="h-9 bg-white text-black text-sm"
                   disabled={isSubmitting}
                 />
@@ -391,6 +536,78 @@ export function ActivosForm() {
             </FormItem>
           )}
         />
+
+        <div className="md:col-span-2 rounded-xl border border-gray-600 bg-[#1f1f1f] p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">
+                Código para etiqueta
+              </label>
+              <Input
+                type="text"
+                value={codigoBarras}
+                onChange={(e) => {
+                  const valor = e.target.value.toUpperCase();
+                  setCodigoBarras(valor);
+                  form.setValue("numeroControl", valor);
+                }}
+                placeholder="Ej. CDH CHR 002-009-002"
+                className="h-9 bg-white text-black text-sm"
+                disabled={isSubmitting}
+              />
+
+              <p className="mt-2 text-xs text-gray-300">
+                Este valor se usa para generar e imprimir la etiqueta del activo.
+              </p>
+
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  onClick={imprimirEtiqueta}
+                  className="h-9 px-5 text-sm bg-green-600 hover:bg-green-700"
+                  disabled={isSubmitting || !codigoBarras.trim()}
+                >
+                  Imprimir etiqueta
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm text-gray-300">Vista previa de etiqueta:</p>
+              <div id="area-etiqueta">
+                <BarcodePreview value={codigoBarras} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="md:col-span-2">
+          <FormItem>
+            <FormLabel className="text-white text-sm">
+              Imagen del activo
+            </FormLabel>
+            <FormControl>
+              <Input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={handleSeleccionImagen}
+                className="h-auto bg-white text-black text-sm file:mr-4 file:rounded-md file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-white hover:file:bg-blue-700"
+                disabled={isSubmitting}
+              />
+            </FormControl>
+          </FormItem>
+
+          {previewImagen && (
+            <div className="mt-3">
+              <p className="mb-2 text-sm text-gray-300">Vista previa:</p>
+              <img
+                src={previewImagen}
+                alt="Vista previa del activo"
+                className="h-32 w-32 rounded-lg border border-gray-600 object-cover"
+              />
+            </div>
+          )}
+        </div>
 
         <div className="md:col-span-2 flex justify-center gap-3 pt-1">
           <Button

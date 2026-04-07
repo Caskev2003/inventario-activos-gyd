@@ -8,7 +8,13 @@ export type Activo = {
   numeroSerie?: string | null
   condicionesActivo?: string | null
   observaciones?: string | null
-  sucursal: "TAPACHULA" | "TOSCANA" | "CIUDAD_HIDALGO" | "TUXTLA_GUTIERREZ"
+  imagenActivo?: string | null
+ sucursal:
+  | "TAPACHULA"
+  | "TOSCANA"
+  | "CIUDAD_HIDALGO"
+  | "TUXTLA_GUTIERREZ"
+  | "OFICINAS_ADMINISTRATIVAS"
   ubicacion?: string | null
   responsableDirectoId?: number | null
   status: "ACTIVO" | "INACTIVO" | "MANTENIMIENTO" | "BAJA"

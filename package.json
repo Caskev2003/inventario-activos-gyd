@@ -1,13 +1,54 @@
 {
-  "name": "tableros-control-almacen",
+  "name": "inventario_activos_gyd",
   "version": "0.1.0",
   "private": true,
+  "description": "Sistema de inventario de activos de Distribución G&D",
+  "author": "Kevin Castillo",
+  "main": "electron-main.js",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3000",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "electron": "electron .",
+    "desktop": "npm run build && npm run electron",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.gyd.inventarioactivos",
+    "productName": "Inventario Activos GYD",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron-main.js",
+      ".next/standalone/**/*",
+      ".next/static/**/*",
+      "public/**/*",
+      "prisma/**/*",
+      "build/**/*",
+      "package.json",
+      "auth.ts",
+      ".env"
+    ],
+    "extraMetadata": {
+      "main": "electron-main.js"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/logo.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Inventario Activos GYD"
+    }
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",
@@ -40,6 +81,7 @@
     "embla-carousel-react": "^8.5.2",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
+    "jsbarcode": "^3.12.3",
     "lucide-react": "^0.477.0",
     "next": "^14.2.23",
     "next-auth": "^5.0.0-beta.25",
@@ -53,6 +95,7 @@
     "react-player": "^2.16.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.3",
+    "sharp": "^0.34.2",
     "sonner": "^2.0.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
@@ -66,6 +109,8 @@
     "@types/nodemailer": "^7.0.3",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "electron": "^41.1.1",
+    "electron-builder": "^25.1.8",
     "eslint": "^8",
     "eslint-config-next": "14.2.16",
     "postcss": "^8",

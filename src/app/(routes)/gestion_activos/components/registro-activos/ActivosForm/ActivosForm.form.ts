@@ -49,6 +49,7 @@ export const activoSchema = z.object({
     "TOSCANA",
     "CIUDAD_HIDALGO",
     "TUXTLA_GUTIERREZ",
+    "OFICINAS_ADMINISTRATIVAS",
   ]),
 
   ubicacion: z
