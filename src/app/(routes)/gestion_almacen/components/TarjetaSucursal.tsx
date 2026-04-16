@@ -7,15 +7,23 @@ type Sucursal =
   | "CIUDAD_HIDALGO"
   | "TOSCANA"
   | "TUXTLA_GUTIERREZ"
-  | "OFICINAS_ADMINISTRATIVAS";
+  | "OFICINAS_ADMINISTRATIVAS"
+  | "ALMACEN_CIUDAD_HIDALGO"
+  | "ALMACEN_TUXTLA_GUTIERREZ";
 
 interface Props {
   titulo: string;
   imagen: string;
   sucursal: Sucursal;
+  soloLectura?: boolean;
 }
 
-export function TarjetaSucursal({ titulo, imagen, sucursal }: Props) {
+export function TarjetaSucursal({
+  titulo,
+  imagen,
+  sucursal,
+  soloLectura = false,
+}: Props) {
   const router = useRouter();
 
   return (
@@ -35,26 +43,37 @@ export function TarjetaSucursal({ titulo, imagen, sucursal }: Props) {
       </div>
 
       <div className="p-5 flex flex-col gap-3">
-        <button
-          onClick={() => router.push(`/gestion_activos?sucursal=${sucursal}`)}
-          className="w-full rounded-xl bg-[#0D0A62] text-white py-3 text-sm md:text-base font-medium border border-white/20 hover:bg-blue-600 transition-all duration-300"
-        >
-          📦 Gestión de activos
-        </button>
+        {soloLectura ? (
+          <button
+            onClick={() => router.push(`/gestion_activos?sucursal=${sucursal}&modo=consulta`)}
+            className="w-full rounded-xl bg-[#0D0A62] text-white py-3 text-sm md:text-base font-medium border border-white/20 hover:bg-blue-600 transition-all duration-300"
+          >
+            👁️ Ver tabla
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={() => router.push(`/gestion_activos?sucursal=${sucursal}`)}
+              className="w-full rounded-xl bg-[#0D0A62] text-white py-3 text-sm md:text-base font-medium border border-white/20 hover:bg-blue-600 transition-all duration-300"
+            >
+              📦 Gestión de activos
+            </button>
 
-        <button
-          onClick={() => router.push(`/historial-activos?sucursal=${sucursal}`)}
-          className="w-full rounded-xl bg-[#0D0A62] text-white py-3 text-sm md:text-base font-medium border border-white/20 hover:bg-blue-600 transition-all duration-300"
-        >
-          📜 Historial
-        </button>
+            <button
+              onClick={() => router.push(`/historial-activos?sucursal=${sucursal}`)}
+              className="w-full rounded-xl bg-[#0D0A62] text-white py-3 text-sm md:text-base font-medium border border-white/20 hover:bg-blue-600 transition-all duration-300"
+            >
+              📜 Historial
+            </button>
 
-        <button
-          onClick={() => router.push(`/reportes-activos?sucursal=${sucursal}`)}
-          className="w-full rounded-xl bg-[#0D0A62] text-white py-3 text-sm md:text-base font-medium border border-white/20 hover:bg-blue-600 transition-all duration-300"
-        >
-          📊 Reportes
-        </button>
+            <button
+              onClick={() => router.push(`/gestion_activos/reportes?sucursal=${sucursal}`)}
+              className="w-full rounded-xl bg-[#0D0A62] text-white py-3 text-sm md:text-base font-medium border border-white/20 hover:bg-blue-600 transition-all duration-300"
+            >
+              📊 Reportes
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

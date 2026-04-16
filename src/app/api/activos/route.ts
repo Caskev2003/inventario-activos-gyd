@@ -3,10 +3,12 @@ import { db } from "@/lib/db";
 
 type Sucursal =
   | "TAPACHULA"
-  | "TOSCANA"
   | "CIUDAD_HIDALGO"
+  | "TOSCANA"
   | "TUXTLA_GUTIERREZ"
-  | "OFICINAS_ADMINISTRATIVAS";
+  | "OFICINAS_ADMINISTRATIVAS"
+  | "ALMACEN_CIUDAD_HIDALGO"
+  | "ALMACEN_TUXTLA_GUTIERREZ";
 
 type EstadoActivo =
   | "ACTIVO"
@@ -22,12 +24,20 @@ type TipoMovimiento =
   | "CAMBIO_UBICACION"
   | "TRANSFERENCIA";
 
+type TipoEquipoActivo =
+  | "EQUIPO_MOBILIARIO"
+  | "EQUIPO_OFICINA"
+  | "EQUIPO_REPARTO"
+  | "EQUIPO_TRANSPORTE";
+
 const SUCURSALES_VALIDAS: Sucursal[] = [
   "TAPACHULA",
-  "TOSCANA",
   "CIUDAD_HIDALGO",
+  "TOSCANA",
   "TUXTLA_GUTIERREZ",
-  "OFICINAS_ADMINISTRATIVAS"
+  "OFICINAS_ADMINISTRATIVAS",
+  "ALMACEN_CIUDAD_HIDALGO",
+  "ALMACEN_TUXTLA_GUTIERREZ",
 ];
 
 const ESTADOS_VALIDOS: EstadoActivo[] = [
@@ -37,12 +47,23 @@ const ESTADOS_VALIDOS: EstadoActivo[] = [
   "BAJA",
 ];
 
+const TIPOS_EQUIPO_VALIDOS: TipoEquipoActivo[] = [
+  "EQUIPO_MOBILIARIO",
+  "EQUIPO_OFICINA",
+  "EQUIPO_REPARTO",
+  "EQUIPO_TRANSPORTE",
+];
+
 function esSucursalValida(valor: string | null): valor is Sucursal {
   return !!valor && SUCURSALES_VALIDAS.includes(valor as Sucursal);
 }
 
 function esEstadoValido(valor: string | null): valor is EstadoActivo {
   return !!valor && ESTADOS_VALIDOS.includes(valor as EstadoActivo);
+}
+
+function esTipoEquipoValido(valor: string | null): valor is TipoEquipoActivo {
+  return !!valor && TIPOS_EQUIPO_VALIDOS.includes(valor as TipoEquipoActivo);
 }
 
 async function registrarHistorial(params: {
@@ -158,8 +179,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const numeroControl = String(body.numeroControl ?? "").trim();
+    const numeroControl = String(body.numeroControl ?? "").trim().toUpperCase();
     const descripcionActivo = String(body.descripcionActivo ?? "").trim();
+    const tipoEquipoBody = body.tipoEquipo ? String(body.tipoEquipo).trim() : null;
     const existencia = Number(body.existencia);
     const medidas = body.medidas ? String(body.medidas).trim() : null;
     const modeloMarca = body.modeloMarca ? String(body.modeloMarca).trim() : null;
@@ -188,6 +210,13 @@ export async function POST(request: NextRequest) {
     if (!descripcionActivo) {
       return NextResponse.json(
         { error: "La descripción del activo es obligatoria" },
+        { status: 400 }
+      );
+    }
+
+    if (!esTipoEquipoValido(tipoEquipoBody)) {
+      return NextResponse.json(
+        { error: "El tipo de equipo es obligatorio y debe ser válido" },
         { status: 400 }
       );
     }
@@ -222,6 +251,7 @@ export async function POST(request: NextRequest) {
 
     const sucursal: Sucursal = sucursalBody;
     const status: EstadoActivo = statusBody;
+    const tipoEquipo: TipoEquipoActivo = tipoEquipoBody;
 
     const responsableExiste = await db.usuario.findUnique({
       where: { id: responsableDirectoId },
@@ -234,16 +264,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const numeroControlExiste = await db.activo_fijo.findUnique({
-      where: { numeroControl },
-    });
 
-    if (numeroControlExiste) {
-      return NextResponse.json(
-        { error: "Ya existe un activo con ese número de control" },
-        { status: 400 }
-      );
-    }
 
     if (numeroSerie) {
       const numeroSerieExiste = await db.activo_fijo.findFirst({
@@ -262,6 +283,7 @@ export async function POST(request: NextRequest) {
       data: {
         numeroControl,
         descripcionActivo,
+        tipoEquipo,
         existencia,
         medidas,
         modeloMarca,
@@ -290,7 +312,7 @@ export async function POST(request: NextRequest) {
       numeroControl: nuevoActivo.numeroControl,
       descripcion: nuevoActivo.descripcionActivo,
       tipoMovimiento: "ALTA",
-      detalle: `Se registró el activo con status ${nuevoActivo.status}${
+      detalle: `Se registró el activo [Tipo de equipo: ${nuevoActivo.tipoEquipo}] con status ${nuevoActivo.status}${
         nuevoActivo.ubicacion ? ` en ubicación ${nuevoActivo.ubicacion}` : ""
       }${nuevoActivo.imagenActivo ? " con imagen adjunta" : ""}`,
       sucursal: nuevoActivo.sucursal as Sucursal,
@@ -319,8 +341,9 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
 
     const id = Number(body.id);
-    const numeroControl = String(body.numeroControl ?? "").trim();
+    const numeroControl = String(body.numeroControl ?? "").trim().toUpperCase();
     const descripcionActivo = String(body.descripcionActivo ?? "").trim();
+    const tipoEquipoBody = body.tipoEquipo ? String(body.tipoEquipo).trim() : null;
     const existencia = Number(body.existencia);
     const medidas = body.medidas ? String(body.medidas).trim() : null;
     const modeloMarca = body.modeloMarca ? String(body.modeloMarca).trim() : null;
@@ -361,6 +384,13 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    if (!esTipoEquipoValido(tipoEquipoBody)) {
+      return NextResponse.json(
+        { error: "El tipo de equipo es obligatorio y debe ser válido" },
+        { status: 400 }
+      );
+    }
+
     if (isNaN(existencia) || existencia < 1) {
       return NextResponse.json(
         { error: "La existencia debe ser mayor a 0" },
@@ -391,6 +421,7 @@ export async function PUT(request: NextRequest) {
 
     const sucursal: Sucursal = sucursalBody;
     const status: EstadoActivo = statusBody;
+    const tipoEquipo: TipoEquipoActivo = tipoEquipoBody;
 
     const activoExiste = await db.activo_fijo.findUnique({
       where: { id },
@@ -423,19 +454,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const numeroControlDuplicado = await db.activo_fijo.findFirst({
-      where: {
-        numeroControl,
-        NOT: { id },
-      },
-    });
 
-    if (numeroControlDuplicado) {
-      return NextResponse.json(
-        { error: "Ya existe otro activo con ese número de control" },
-        { status: 400 }
-      );
-    }
 
     if (numeroSerie) {
       const numeroSerieDuplicado = await db.activo_fijo.findFirst({
@@ -461,6 +480,10 @@ export async function PUT(request: NextRequest) {
 
     if (activoExiste.descripcionActivo !== descripcionActivo) {
       cambios.push(`Descripción: ${activoExiste.descripcionActivo} → ${descripcionActivo}`);
+    }
+
+    if (activoExiste.tipoEquipo !== tipoEquipo) {
+      cambios.push(`Tipo de equipo: ${activoExiste.tipoEquipo} → ${tipoEquipo}`);
     }
 
     if (activoExiste.existencia !== existencia) {
@@ -522,6 +545,7 @@ export async function PUT(request: NextRequest) {
       data: {
         numeroControl,
         descripcionActivo,
+        tipoEquipo,
         existencia,
         medidas,
         modeloMarca,
@@ -639,7 +663,7 @@ export async function DELETE(request: NextRequest) {
       numeroControl: activo.numeroControl,
       descripcion: activo.descripcionActivo,
       tipoMovimiento: "BAJA",
-      detalle: `Se eliminó el activo con status ${activo.status}${
+      detalle: `Se eliminó el activo [Tipo de equipo: ${activo.tipoEquipo}] con status ${activo.status}${
         activo.ubicacion ? ` ubicado en ${activo.ubicacion}` : ""
       }`,
       sucursal: activo.sucursal as Sucursal,

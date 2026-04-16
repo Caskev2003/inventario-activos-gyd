@@ -3,8 +3,8 @@ import { z } from "zod"
 
 const roles = [
   "ADMINISTRADOR",
-  "SUPERVISOR",
-  "CAPTURISTA",
+  "INVENTARIOS",
+  "AUXILIAR_INVENTARIOS",
   "CONSULTA",
 ] as const
 

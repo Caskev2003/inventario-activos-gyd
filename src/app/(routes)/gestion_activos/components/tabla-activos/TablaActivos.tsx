@@ -26,27 +26,91 @@ import { ModalEditarActivo } from "../modal-editar-activo";
 
 type Sucursal =
   | "TAPACHULA"
-  | "TOSCANA"
   | "CIUDAD_HIDALGO"
+  | "TOSCANA"
   | "TUXTLA_GUTIERREZ"
-  | "OFICINAS_ADMINISTRATIVAS";
+  | "OFICINAS_ADMINISTRATIVAS"
+  | "ALMACEN_CIUDAD_HIDALGO"
+  | "ALMACEN_TUXTLA_GUTIERREZ";
+
+type TipoEquipoActivo =
+  | "EQUIPO_MOBILIARIO"
+  | "EQUIPO_OFICINA"
+  | "EQUIPO_REPARTO"
+  | "EQUIPO_TRANSPORTE";
 
 interface Props {
   refrescar?: number;
   busqueda?: string;
   sucursalFiltro?: string;
+  creadoPorId?: number;
+  soloLectura?: boolean;
 }
 
 const SUCURSALES_VALIDAS: Sucursal[] = [
   "TAPACHULA",
-  "TOSCANA",
   "CIUDAD_HIDALGO",
+  "TOSCANA",
   "TUXTLA_GUTIERREZ",
   "OFICINAS_ADMINISTRATIVAS",
+  "ALMACEN_CIUDAD_HIDALGO",
+  "ALMACEN_TUXTLA_GUTIERREZ",
 ];
+
+const TIPOS_EQUIPO_VALIDOS: TipoEquipoActivo[] = [
+  "EQUIPO_MOBILIARIO",
+  "EQUIPO_OFICINA",
+  "EQUIPO_REPARTO",
+  "EQUIPO_TRANSPORTE",
+];
+
+function obtenerOrdenTipoEquipo(tipo?: TipoEquipoActivo | string | null) {
+  switch (tipo) {
+    case "EQUIPO_MOBILIARIO":
+      return 1;
+    case "EQUIPO_OFICINA":
+      return 2;
+    case "EQUIPO_REPARTO":
+      return 3;
+    case "EQUIPO_TRANSPORTE":
+      return 4;
+    default:
+      return 99;
+  }
+}
+
+function extraerNumerosControl(numeroControl: string) {
+  const match = numeroControl
+    .trim()
+    .toUpperCase()
+    .match(/(\d+)-(\d+)(?:-(\d+))?/);
+
+  if (!match) return [0, 0, 0];
+
+  return [
+    Number(match[1] ?? 0),
+    Number(match[2] ?? 0),
+    Number(match[3] ?? 0),
+  ];
+}
+
+function compararNumeroControl(a: string, b: string) {
+  const aPartes = extraerNumerosControl(a);
+  const bPartes = extraerNumerosControl(b);
+
+  return (
+    aPartes[0] - bPartes[0] ||
+    aPartes[1] - bPartes[1] ||
+    aPartes[2] - bPartes[2]
+  );
+}
 
 function esSucursalValida(valor: string): valor is Sucursal {
   return SUCURSALES_VALIDAS.includes(valor as Sucursal);
+}
+
+function esTipoEquipoValido(valor: string): valor is TipoEquipoActivo {
+  return TIPOS_EQUIPO_VALIDOS.includes(valor as TipoEquipoActivo);
 }
 
 function formatearSucursal(sucursal?: string | null) {
@@ -54,10 +118,27 @@ function formatearSucursal(sucursal?: string | null) {
   return sucursal.replaceAll("_", " ");
 }
 
+function formatearTipoEquipo(tipo?: string | null) {
+  switch (tipo) {
+    case "EQUIPO_MOBILIARIO":
+      return "Equipo mobiliario";
+    case "EQUIPO_OFICINA":
+      return "Equipo de oficina";
+    case "EQUIPO_REPARTO":
+      return "Equipo de reparto";
+    case "EQUIPO_TRANSPORTE":
+      return "Equipo de transporte";
+    default:
+      return "-";
+  }
+}
+
 export function TablaActivos({
   refrescar = 0,
   busqueda = "",
   sucursalFiltro = "",
+  creadoPorId,
+  soloLectura = false,
 }: Props) {
   const [activos, setActivos] = useState<Activo[]>([]);
   const [activoSeleccionado, setActivoSeleccionado] = useState<Activo | null>(null);
@@ -69,12 +150,14 @@ export function TablaActivos({
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busquedaLocal, setBusquedaLocal] = useState("");
+  const [tipoEquipoFiltro, setTipoEquipoFiltro] = useState<"" | TipoEquipoActivo>("");
 
   const inputBusquedaRef = useRef<HTMLInputElement | null>(null);
 
   const itemsPerPage = 10;
 
   const abrirModalEditar = (item: Activo) => {
+    if (soloLectura) return;
     setActivoEditar(item);
     setOpenEditar(true);
   };
@@ -84,8 +167,67 @@ export function TablaActivos({
     setOpenImagen(true);
   };
 
-  const normalizarBusqueda = (valor: string) => {
+  const limpiarEntradaEscaner = (valor: string) => {
     return valor
+      .toUpperCase()
+      .replace(/[`´]/g, " ")
+      .replace(/[_]+/g, " ")
+      .replace(/\r/g, "")
+      .replace(/\n/g, "")
+      .replace(/\t/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const agruparNumerosDeTres = (numeros: string) => {
+    if (!numeros) return "";
+
+    if (numeros.length >= 6 && numeros.length % 3 === 0) {
+      const grupos = numeros.match(/.{1,3}/g);
+      return grupos ? grupos.join("-") : numeros;
+    }
+
+    return numeros;
+  };
+
+  const formatearCodigoEscaneado = (valor: string) => {
+    const limpio = limpiarEntradaEscaner(valor);
+
+    if (!limpio) return "";
+
+    if (/^[A-Z]{3}\s+[A-Z0-9]+\s+\d{3}(?:-\d{3})+$/.test(limpio)) {
+      return limpio;
+    }
+
+    const compacto = limpio.replace(/[^A-Z0-9]/g, "");
+
+    const matchCompacto = compacto.match(/^([A-Z]{3})([A-Z0-9]+?)(\d{6,})$/);
+    if (matchCompacto) {
+      const [, prefijo, tipo, numeros] = matchCompacto;
+      return `${prefijo} ${tipo} ${agruparNumerosDeTres(numeros)}`;
+    }
+
+    const matchConEspacios = limpio.match(/^([A-Z]{3})\s+([A-Z0-9]+)\s+(\d{6,})$/);
+    if (matchConEspacios) {
+      const [, prefijo, tipo, numeros] = matchConEspacios;
+      return `${prefijo} ${tipo} ${agruparNumerosDeTres(numeros)}`;
+    }
+
+    const matchSeparado = limpio.match(/^([A-Z]{3})\s+([A-Z0-9]+)\s+((?:\d{3}\s*){2,4})$/);
+    if (matchSeparado) {
+      const [, prefijo, tipo, numeros] = matchSeparado;
+      const soloNumeros = numeros.replace(/\s+/g, "");
+      return `${prefijo} ${tipo} ${agruparNumerosDeTres(soloNumeros)}`;
+    }
+
+    return limpio;
+  };
+
+  const normalizarBusqueda = (valor: string) => {
+    return formatearCodigoEscaneado(valor)
+      .toUpperCase()
+      .replace(/[`´]/g, " ")
+      .replace(/[_]+/g, " ")
       .replace(/\r/g, "")
       .replace(/\n/g, "")
       .replace(/\t/g, " ")
@@ -121,6 +263,8 @@ export function TablaActivos({
   };
 
   const eliminarActivo = async (id: number, descripcion: string) => {
+    if (soloLectura) return;
+
     try {
       const params = new URLSearchParams();
       params.append("id", String(id));
@@ -160,7 +304,7 @@ export function TablaActivos({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [busqueda, busquedaLocal, sucursalFiltro]);
+  }, [busqueda, busquedaLocal, sucursalFiltro, tipoEquipoFiltro]);
 
   useEffect(() => {
     inputBusquedaRef.current?.focus();
@@ -183,7 +327,19 @@ export function TablaActivos({
   };
 
   const datosAMostrar = useMemo(() => {
-    let datos = [...activos];
+    let datos = [...activos].sort((a, b) => {
+      const ordenTipo =
+        obtenerOrdenTipoEquipo(a.tipoEquipo) -
+        obtenerOrdenTipoEquipo(b.tipoEquipo);
+
+      if (ordenTipo !== 0) return ordenTipo;
+
+      return compararNumeroControl(a.numeroControl, b.numeroControl);
+    });
+
+    if (tipoEquipoFiltro) {
+      datos = datos.filter((item) => item.tipoEquipo === tipoEquipoFiltro);
+    }
 
     if (textoBusqueda !== "") {
       const coincidenciasExactas = datos.filter(
@@ -198,6 +354,7 @@ export function TablaActivos({
         return (
           normalizarBusqueda(item.numeroControl).includes(textoBusqueda) ||
           normalizarBusqueda(item.descripcionActivo ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(formatearTipoEquipo(item.tipoEquipo)).includes(textoBusqueda) ||
           normalizarBusqueda(item.numeroSerie ?? "").includes(textoBusqueda) ||
           normalizarBusqueda(item.modeloMarca ?? "").includes(textoBusqueda) ||
           normalizarBusqueda(item.ubicacion ?? "").includes(textoBusqueda) ||
@@ -211,7 +368,7 @@ export function TablaActivos({
     }
 
     return datos;
-  }, [activos, textoBusqueda]);
+  }, [activos, textoBusqueda, tipoEquipoFiltro]);
 
   const totalPages = Math.max(1, Math.ceil(datosAMostrar.length / itemsPerPage));
 
@@ -268,106 +425,62 @@ export function TablaActivos({
   };
 
   const exportarExcel = async () => {
-    if (!datosAMostrar.length) return;
+    if (soloLectura || !datosAMostrar.length) return;
 
     setExporting(true);
 
     try {
-      const ExcelJS = await import("exceljs");
-      const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet("Activos");
-
-      const headers = [
-        "Número de control",
-        "Descripción del activo",
-        "Existencia",
-        "Medidas",
-        "Modelo/Marca",
-        "Número de serie",
-        "Condiciones",
-        "Observaciones",
-        "Sucursal",
-        "Ubicación",
-        "Responsable",
-        "Status",
-        "Creado",
-      ];
-
-      const data = datosAMostrar.map((a) => [
-        a.numeroControl,
-        a.descripcionActivo ?? "",
-        Number(a.existencia ?? 0),
-        a.medidas ?? "",
-        a.modeloMarca ?? "",
-        a.numeroSerie ?? "",
-        a.condicionesActivo ?? "",
-        a.observaciones ?? "",
-        formatearSucursal(a.sucursal),
-        a.ubicacion ?? "",
-        a.responsableDirecto?.nombre ?? (a.responsableDirectoId ?? ""),
-        a.status ?? "",
-        a.createdAt ? new Date(a.createdAt as any).toLocaleDateString() : "",
-      ]);
-
-      ws.addTable({
-        name: "TablaActivos",
-        ref: "A1",
-        headerRow: true,
-        totalsRow: false,
-        style: {
-          theme: "TableStyleMedium9",
-          showRowStripes: true,
+      const response = await fetch("/api/reportes/exportar-excel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        columns: headers.map((h) => ({ name: h })),
-        rows: data,
+        body: JSON.stringify({
+          sucursal:
+            sucursalFiltro && esSucursalValida(sucursalFiltro)
+              ? sucursalFiltro
+              : null,
+          creadoPorId: creadoPorId ?? null,
+        }),
       });
 
-      ws.views = [{ state: "frozen", ySplit: 1 }];
-
-      for (let c = 1; c <= headers.length; c++) {
-        let max = headers[c - 1].length;
-
-        for (const row of data) {
-          const len = String(row[c - 1] ?? "").length;
-          if (len > max) max = len;
-        }
-
-        ws.getColumn(c).width = Math.min(Math.max(max + 2, 10), 50);
+      if (!response.ok) {
+        throw new Error("No se pudo generar el archivo.");
       }
 
-      const buf = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buf], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
 
-      const dt = new Date();
-      const stamp = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(
-        2,
-        "0"
-      )}-${String(dt.getDate()).padStart(2, "0")}__${String(
-        dt.getHours()
-      ).padStart(2, "0")}${String(dt.getMinutes()).padStart(2, "0")}`;
+      const disposition = response.headers.get("Content-Disposition");
+      let fileName = "reporte.xlsx";
 
-      const nombreSucursal =
-        sucursalFiltro && esSucursalValida(sucursalFiltro)
-          ? `-${sucursalFiltro}`
-          : "";
+      if (disposition) {
+        const match = disposition.match(/filename="(.+)"/);
+        if (match?.[1]) {
+          fileName = match[1];
+        }
+      }
 
-      const name = `Activos${nombreSucursal}-${stamp}.xlsx`;
-      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-
       a.href = url;
-      a.download = name;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error(e);
+
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Excel exportado",
+        description:
+          "El archivo se descargó y se guardó en el módulo de reportes.",
+      });
+    } catch (error) {
+      console.error(error);
+
       toast({
         title: "No se pudo generar el Excel",
-        description: "Verifica la instalación de exceljs.",
+        description: "Ocurrió un error al exportar y guardar el reporte.",
         variant: "destructive",
       });
     } finally {
@@ -388,34 +501,36 @@ export function TablaActivos({
             )}
           </h3>
 
-          <button
-            onClick={exportarExcel}
-            disabled={exporting || !datosAMostrar.length}
-            className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-md transition ${
-              exporting || !datosAMostrar.length
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                : "bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 text-white hover:brightness-110 active:scale-[0.98]"
-            }`}
-            title={
-              !datosAMostrar.length ? "No hay datos para exportar" : "Exportar a Excel"
-            }
-          >
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/20 backdrop-blur-sm">
-              <FileSpreadsheet className="h-4 w-4" />
-            </span>
-            {exporting ? "Exportando..." : "Exportar Excel"}
-          </button>
+          {!soloLectura && (
+            <button
+              onClick={exportarExcel}
+              disabled={exporting || !datosAMostrar.length}
+              className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-md transition ${
+                exporting || !datosAMostrar.length
+                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                  : "bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 text-white hover:brightness-110 active:scale-[0.98]"
+              }`}
+              title={
+                !datosAMostrar.length ? "No hay datos para exportar" : "Exportar a Excel"
+              }
+            >
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/20 backdrop-blur-sm">
+                <FileSpreadsheet className="h-4 w-4" />
+              </span>
+              {exporting ? "Exportando..." : "Exportar Excel"}
+            </button>
+          )}
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               ref={inputBusquedaRef}
               type="text"
-              placeholder="Escanea o busca por control, descripción, serie, modelo, ubicación..."
+              placeholder="Escanea o busca por control, descripción, tipo, serie, modelo, ubicación..."
               value={busquedaLocal}
-              onChange={(e) => setBusquedaLocal(e.target.value)}
+              onChange={(e) => setBusquedaLocal(formatearCodigoEscaneado(e.target.value))}
               onKeyDown={manejarEnterBusqueda}
               autoComplete="off"
               autoCapitalize="off"
@@ -438,6 +553,22 @@ export function TablaActivos({
                 ✕
               </button>
             )}
+          </div>
+
+          <div className="w-full max-w-sm">
+            <select
+              value={tipoEquipoFiltro}
+              onChange={(e) =>
+                setTipoEquipoFiltro(e.target.value as "" | TipoEquipoActivo)
+              }
+              className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 px-3 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+            >
+              <option value="">Todos los tipos de equipo</option>
+              <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
+              <option value="EQUIPO_OFICINA">Equipo de oficina</option>
+              <option value="EQUIPO_REPARTO">Equipo de reparto</option>
+              <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
+            </select>
           </div>
         </div>
       </div>
@@ -514,6 +645,7 @@ export function TablaActivos({
             <tr>
               <th className="p-3 text-left">N° Control</th>
               <th className="p-3 text-left">Descripción</th>
+              <th className="p-3 text-left">Tipo de equipo</th>
               <th className="p-3 text-left">Existencia</th>
               <th className="p-3 text-left">Medidas</th>
               <th className="p-3 text-left">Modelo/Marca</th>
@@ -533,7 +665,7 @@ export function TablaActivos({
             {loading && (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={15}
                   className="text-center py-4 text-white bg-[#424242] font-semibold"
                 >
                   Cargando activos...
@@ -544,7 +676,7 @@ export function TablaActivos({
             {!loading && currentItems.length === 0 && (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={15}
                   className="text-center py-4 text-red-500 bg-[#424242] font-semibold"
                 >
                   No hay activos registrados.
@@ -560,6 +692,7 @@ export function TablaActivos({
                 >
                   <td className="p-2">{item.numeroControl}</td>
                   <td className="p-2">{item.descripcionActivo}</td>
+                  <td className="p-2">{formatearTipoEquipo(item.tipoEquipo)}</td>
                   <td className="p-2">{item.existencia}</td>
                   <td className="p-2">{item.medidas || "-"}</td>
                   <td className="p-2">{item.modeloMarca || "-"}</td>
@@ -589,59 +722,67 @@ export function TablaActivos({
                       <Eye className="h-4 w-4" />
                     </button>
 
-                    <button
-                      onClick={() => abrirModalEditar(item)}
-                      className="bg-gradient-to-b from-blue-600 to-blue-800 text-white px-3 py-1 rounded-[5px] hover:bg-blue-700 transition mr-2"
-                      title="Editar activo"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
+                    {soloLectura ? (
+                      <span className="inline-block text-xs text-gray-300">
+                        Solo lectura
+                      </span>
+                    ) : (
+                      <>
                         <button
-                          onClick={() => setActivoSeleccionado(item)}
-                          className="bg-gradient-to-b from-[#c62828] to-[#9d4245] text-white px-3 py-1 rounded-[5px] hover:bg-red-700 transition"
-                          title="Eliminar activo"
+                          onClick={() => abrirModalEditar(item)}
+                          className="bg-gradient-to-b from-blue-600 to-blue-800 text-white px-3 py-1 rounded-[5px] hover:bg-blue-700 transition mr-2"
+                          title="Editar activo"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </button>
-                      </AlertDialogTrigger>
 
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Estás a punto de eliminar el activo{" "}
-                            <strong>{activoSeleccionado?.descripcionActivo}</strong>.
-                            Esta acción no se puede revertir.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              onClick={() => setActivoSeleccionado(item)}
+                              className="bg-gradient-to-b from-[#c62828] to-[#9d4245] text-white px-3 py-1 rounded-[5px] hover:bg-red-700 transition"
+                              title="Eliminar activo"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </AlertDialogTrigger>
 
-                        <AlertDialogFooter>
-                          <AlertDialogCancel
-                            className="hover:bg-white hover:text-black transition-all"
-                            onClick={() => setActivoSeleccionado(null)}
-                          >
-                            Cancelar
-                          </AlertDialogCancel>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Estás a punto de eliminar el activo{" "}
+                                <strong>{activoSeleccionado?.descripcionActivo}</strong>.
+                                Esta acción no se puede revertir.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
 
-                          <AlertDialogAction
-                            onClick={() => {
-                              if (activoSeleccionado) {
-                                eliminarActivo(
-                                  activoSeleccionado.id,
-                                  activoSeleccionado.descripcionActivo
-                                );
-                              }
-                            }}
-                            className="bg-red-500 hover:bg-red-700"
-                          >
-                            Sí, eliminar
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel
+                                className="hover:bg-white hover:text-black transition-all"
+                                onClick={() => setActivoSeleccionado(null)}
+                              >
+                                Cancelar
+                              </AlertDialogCancel>
+
+                              <AlertDialogAction
+                                onClick={() => {
+                                  if (activoSeleccionado) {
+                                    eliminarActivo(
+                                      activoSeleccionado.id,
+                                      activoSeleccionado.descripcionActivo
+                                    );
+                                  }
+                                }}
+                                className="bg-red-500 hover:bg-red-700"
+                              >
+                                Sí, eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -649,12 +790,14 @@ export function TablaActivos({
         </table>
       </div>
 
-      <ModalEditarActivo
-        open={openEditar}
-        onOpenChange={setOpenEditar}
-        activo={activoEditar}
-        onSuccess={fetchActivos}
-      />
+      {!soloLectura && (
+        <ModalEditarActivo
+          open={openEditar}
+          onOpenChange={setOpenEditar}
+          activo={activoEditar}
+          onSuccess={fetchActivos}
+        />
+      )}
 
       <Dialog open={openImagen} onOpenChange={setOpenImagen}>
         <DialogContent className="max-w-3xl bg-[#2f2f2f] text-white border border-gray-700">

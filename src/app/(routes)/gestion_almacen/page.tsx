@@ -6,6 +6,8 @@ import { OficinasAdministrativas } from "./components/OficinasAdministrativas";
 import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
 import { ButtonRegresar } from "./components/ButtonRegresar";
+import { AlmacenHidalgo } from "./components/AlmacenHidalgo";
+import { AlmacenTuxtla } from "./components/AlmacenTuxtla";
 
 export default async function Page() {
   const session = await auth();
@@ -32,6 +34,10 @@ export default async function Page() {
           <SucursalToscana />
           <SucursalTuxtla />
           <OficinasAdministrativas />
+          <AlmacenHidalgo />
+          <AlmacenTuxtla />
+         
+          
         </div>
 
         <div className="flex justify-center mt-10">

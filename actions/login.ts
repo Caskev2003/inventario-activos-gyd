@@ -29,17 +29,23 @@ export async function login({ correo, password }: LoginData) {
       return { error: "Contraseña incorrecta" };
     }
 
-    let redirectTo = "/";
+    let redirectTo = "/login";
 
     switch (user.rol) {
       case "ADMINISTRADOR":
         redirectTo = "/";
         break;
 
-      case "SUPERVISOR":
-      case "CAPTURISTA":
+      case "INVENTARIOS":
+        redirectTo = "/inventarios";
+        break;
+
+      case "AUXILIAR_INVENTARIOS":
+        redirectTo = "/auxiliar_inventarios";
+        break;
+
       case "CONSULTA":
-        redirectTo = "/gestion_almacen";
+        redirectTo = "/consulta";
         break;
 
       default:

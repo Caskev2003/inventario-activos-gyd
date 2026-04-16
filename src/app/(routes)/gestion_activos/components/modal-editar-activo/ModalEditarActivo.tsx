@@ -13,6 +13,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+type TipoEquipoActivo =
+  | "EQUIPO_MOBILIARIO"
+  | "EQUIPO_OFICINA"
+  | "EQUIPO_REPARTO"
+  | "EQUIPO_TRANSPORTE";
+
+type Sucursal =
+  | "TAPACHULA"
+  | "CIUDAD_HIDALGO"
+  | "TOSCANA"
+  | "TUXTLA_GUTIERREZ"
+  | "OFICINAS_ADMINISTRATIVAS"
+  | "ALMACEN_CIUDAD_HIDALGO"
+  | "ALMACEN_TUXTLA_GUTIERREZ";
+
+type EstadoActivo = "ACTIVO" | "INACTIVO" | "MANTENIMIENTO" | "BAJA";
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,10 +47,27 @@ export function ModalEditarActivo({
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [previewImagen, setPreviewImagen] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    id: number;
+    numeroControl: string;
+    descripcionActivo: string;
+    tipoEquipo: TipoEquipoActivo;
+    existencia: number;
+    medidas: string;
+    modeloMarca: string;
+    numeroSerie: string;
+    condicionesActivo: string;
+    observaciones: string;
+    imagenActivo: string;
+    sucursal: Sucursal;
+    ubicacion: string;
+    responsableDirectoId: number;
+    status: EstadoActivo;
+  }>({
     id: 0,
     numeroControl: "",
     descripcionActivo: "",
+    tipoEquipo: "EQUIPO_MOBILIARIO",
     existencia: 1,
     medidas: "",
     modeloMarca: "",
@@ -53,6 +87,7 @@ export function ModalEditarActivo({
         id: activo.id,
         numeroControl: activo.numeroControl ?? "",
         descripcionActivo: activo.descripcionActivo ?? "",
+        tipoEquipo: activo.tipoEquipo ?? "EQUIPO_MOBILIARIO",
         existencia: Number(activo.existencia ?? 1),
         medidas: activo.medidas ?? "",
         modeloMarca: activo.modeloMarca ?? "",
@@ -140,6 +175,7 @@ export function ModalEditarActivo({
 
       await axios.put("/api/activos", {
         ...formData,
+        numeroControl: formData.numeroControl.toUpperCase(),
         imagenActivo,
       });
 
@@ -170,16 +206,16 @@ export function ModalEditarActivo({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl bg-[#353535] border border-white/10 text-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto border border-white/10 bg-[#353535] text-white">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-center">
+          <DialogTitle className="text-center text-xl font-bold">
             Editar activo
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+        <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="text-sm mb-1 block">Número de control</label>
+            <label className="mb-1 block text-sm">Número de control</label>
             <Input
               name="numeroControl"
               value={formData.numeroControl}
@@ -189,7 +225,7 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Descripción</label>
+            <label className="mb-1 block text-sm">Descripción</label>
             <Input
               name="descripcionActivo"
               value={formData.descripcionActivo}
@@ -199,7 +235,22 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Existencia</label>
+            <label className="mb-1 block text-sm">Tipo de equipo</label>
+            <select
+              name="tipoEquipo"
+              value={formData.tipoEquipo}
+              onChange={handleChange}
+              className="h-10 w-full rounded-md border bg-white px-3 text-black"
+            >
+              <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
+              <option value="EQUIPO_OFICINA">Equipo de oficina</option>
+              <option value="EQUIPO_REPARTO">Equipo de reparto</option>
+              <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm">Existencia</label>
             <Input
               type="number"
               min={1}
@@ -211,7 +262,7 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Medidas</label>
+            <label className="mb-1 block text-sm">Medidas</label>
             <Input
               name="medidas"
               value={formData.medidas}
@@ -221,7 +272,7 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Modelo / Marca</label>
+            <label className="mb-1 block text-sm">Modelo / Marca</label>
             <Input
               name="modeloMarca"
               value={formData.modeloMarca}
@@ -231,7 +282,7 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Número de serie</label>
+            <label className="mb-1 block text-sm">Número de serie</label>
             <Input
               name="numeroSerie"
               value={formData.numeroSerie}
@@ -241,7 +292,7 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Condiciones</label>
+            <label className="mb-1 block text-sm">Condiciones</label>
             <Input
               name="condicionesActivo"
               value={formData.condicionesActivo}
@@ -251,7 +302,7 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Ubicación</label>
+            <label className="mb-1 block text-sm">Ubicación</label>
             <Input
               name="ubicacion"
               value={formData.ubicacion}
@@ -261,7 +312,7 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Sucursal</label>
+            <label className="mb-1 block text-sm">Sucursal</label>
             <select
               name="sucursal"
               value={formData.sucursal}
@@ -272,11 +323,14 @@ export function ModalEditarActivo({
               <option value="CIUDAD_HIDALGO">Ciudad Hidalgo</option>
               <option value="TOSCANA">Toscana</option>
               <option value="TUXTLA_GUTIERREZ">Tuxtla Gutiérrez</option>
+              <option value="OFICINAS_ADMINISTRATIVAS">Oficinas Administrativas</option>
+              <option value="ALMACEN_CIUDAD_HIDALGO">Almacén Ciudad Hidalgo</option>
+              <option value="ALMACEN_TUXTLA_GUTIERREZ">Almacén Tuxtla Gutiérrez</option>
             </select>
           </div>
 
           <div>
-            <label className="text-sm mb-1 block">Status</label>
+            <label className="mb-1 block text-sm">Status</label>
             <select
               name="status"
               value={formData.status}
@@ -291,18 +345,18 @@ export function ModalEditarActivo({
           </div>
 
           <div className="md:col-span-2">
-            <label className="text-sm mb-1 block">Observaciones</label>
+            <label className="mb-1 block text-sm">Observaciones</label>
             <textarea
               name="observaciones"
               value={formData.observaciones}
               onChange={handleChange}
               rows={4}
-              className="w-full rounded-md border bg-white px-3 py-2 text-black resize-none"
+              className="w-full resize-none rounded-md border bg-white px-3 py-2 text-black"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="text-sm mb-1 block">Imagen del activo</label>
+            <label className="mb-1 block text-sm">Imagen del activo</label>
             <Input
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp"
@@ -311,14 +365,14 @@ export function ModalEditarActivo({
               disabled={loading}
             />
 
-            <div className="mt-4 flex flex-col md:flex-row gap-6">
+            <div className="mt-4 flex flex-col gap-6 md:flex-row">
               <div>
                 <p className="mb-2 text-sm text-gray-300">Imagen actual:</p>
                 {formData.imagenActivo ? (
                   <img
-                    src={`/api/activos/imagen/${formData.imagenActivo}`}
+                    src={`/api/activos/imagen/${encodeURIComponent(formData.imagenActivo)}`}
                     alt={formData.descripcionActivo}
-                    className="h-36 w-36 rounded-lg border border-gray-600 object-cover bg-white"
+                    className="h-36 w-36 rounded-lg border border-gray-600 bg-white object-cover"
                   />
                 ) : (
                   <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-sm text-gray-300">
@@ -333,7 +387,7 @@ export function ModalEditarActivo({
                   <img
                     src={previewImagen}
                     alt="Nueva vista previa"
-                    className="h-36 w-36 rounded-lg border border-gray-600 object-cover bg-white"
+                    className="h-36 w-36 rounded-lg border border-gray-600 bg-white object-cover"
                   />
                 ) : (
                   <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-sm text-gray-300">
@@ -345,7 +399,7 @@ export function ModalEditarActivo({
           </div>
         </div>
 
-        <div className="flex justify-center gap-3 mt-4">
+        <div className="mt-4 flex justify-center gap-3">
           <Button
             type="button"
             onClick={() => onOpenChange(false)}

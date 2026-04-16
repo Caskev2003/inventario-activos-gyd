@@ -4,10 +4,12 @@ import { useRef, useState } from "react";
 
 type Sucursal =
   | "TAPACHULA"
-  | "TOSCANA"
   | "CIUDAD_HIDALGO"
+  | "TOSCANA"
   | "TUXTLA_GUTIERREZ"
-  | "OFICINAS_ADMINISTRATIVAS";
+  | "OFICINAS_ADMINISTRATIVAS"
+  | "ALMACEN_CIUDAD_HIDALGO"
+  | "ALMACEN_TUXTLA_GUTIERREZ";
 
 interface Props {
   sucursal: Sucursal;
@@ -20,14 +22,33 @@ export default function ImportarExcelActivos({ sucursal }: Props) {
   const [mensaje, setMensaje] = useState("");
   const [errores, setErrores] = useState<string[]>([]);
 
+  const limpiarInputArchivo = () => {
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  };
+
   const handleSeleccionarArchivo = () => {
-    inputRef.current?.click();
+    if (!loading) {
+      inputRef.current?.click();
+    }
   };
 
   const handleArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
 
     if (!file) return;
+
+    const nombreArchivo = file.name.toLowerCase();
+    const extensionValida =
+      nombreArchivo.endsWith(".xlsx") || nombreArchivo.endsWith(".xls");
+
+    if (!extensionValida) {
+      setMensaje("Solo se permiten archivos de Excel (.xlsx o .xls).");
+      setErrores([]);
+      limpiarInputArchivo();
+      return;
+    }
 
     try {
       setLoading(true);
@@ -57,18 +78,15 @@ export default function ImportarExcelActivos({ sucursal }: Props) {
         setErrores(data.errores);
       }
 
-      // Espera breve para que el usuario vea el mensaje
       setTimeout(() => {
         window.location.reload();
       }, 800);
     } catch (error: any) {
-      setMensaje(error.message || "Ocurrió un error al importar.");
+      setMensaje(error?.message || "Ocurrió un error al importar.");
+      setErrores([]);
     } finally {
       setLoading(false);
-
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
+      limpiarInputArchivo();
     }
   };
 
@@ -77,7 +95,7 @@ export default function ImportarExcelActivos({ sucursal }: Props) {
       <input
         ref={inputRef}
         type="file"
-        accept=".xlsx,.xls"
+        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
         className="hidden"
         onChange={handleArchivo}
       />
@@ -86,20 +104,20 @@ export default function ImportarExcelActivos({ sucursal }: Props) {
         type="button"
         onClick={handleSeleccionarArchivo}
         disabled={loading}
-        className="bg-amber-500 hover:bg-amber-600 text-white h-10 px-6 rounded-full inline-flex items-center justify-center disabled:opacity-60"
+        className="inline-flex h-10 items-center justify-center rounded-full bg-amber-500 px-6 text-white hover:bg-amber-600 disabled:opacity-60"
       >
         {loading ? "Importando..." : "Importar Excel"}
       </button>
 
       {mensaje && (
-        <div className="max-w-[420px] rounded-lg bg-white/10 border border-white/10 p-3 text-sm text-white">
+        <div className="max-w-[420px] rounded-lg border border-white/10 bg-white/10 p-3 text-sm text-white">
           {mensaje}
         </div>
       )}
 
       {errores.length > 0 && (
-        <div className="max-w-[420px] rounded-lg bg-red-500/10 border border-red-400/20 p-3 text-xs text-red-200 max-h-40 overflow-y-auto">
-          <p className="font-semibold mb-2">Detalles de errores:</p>
+        <div className="max-h-40 max-w-[420px] overflow-y-auto rounded-lg border border-red-400/20 bg-red-500/10 p-3 text-xs text-red-200">
+          <p className="mb-2 font-semibold">Detalles de errores:</p>
           <ul className="space-y-1">
             {errores.map((error, index) => (
               <li key={index}>• {error}</li>

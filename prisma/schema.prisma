@@ -23,50 +23,55 @@ model usuario {
 
   activosResponsable   activo_fijo[]       @relation("ResponsableActivo")
   historialMovimientos historial_activos[] @relation("UsuarioHistorialActivo")
+  reportesGenerados    reporte[]           @relation("UsuarioReporte")
 }
 
 model activo_fijo {
-  id                    Int                 @id @default(autoincrement())
-  numeroControl         String              @unique @db.VarChar(50)
-  descripcionActivo     String              @map("descripcion_activo") @db.VarChar(150)
-  existencia            Int                 @default(1)
-  medidas               String?             @db.VarChar(100)
-  modeloMarca           String?             @map("modelo_marca") @db.VarChar(150)
-  numeroSerie           String?             @unique @map("numero_serie") @db.VarChar(100)
-  condicionesActivo     String?             @map("condiciones_activo") @db.VarChar(150)
-  observaciones         String?             @db.Text
-  imagenActivo          String?             @map("imagen_activo") @db.VarChar(255)
+  id                   Int                 @id @default(autoincrement())
+  numeroControl        String              @db.VarChar(100)
+  descripcionActivo    String              @map("descripcion_activo") @db.VarChar(150)
+  tipoEquipo           TipoEquipoActivo    @map("tipo_equipo")
+  existencia           Int                 @default(1)
+  medidas              String?             @db.VarChar(100)
+  modeloMarca          String?             @map("modelo_marca") @db.VarChar(150)
+  numeroSerie          String?             @unique @map("numero_serie") @db.VarChar(100)
+  condicionesActivo    String?             @map("condiciones_activo") @db.VarChar(150)
+  observaciones        String?             @db.Text
+  imagenActivo         String?             @map("imagen_activo") @db.VarChar(255)
 
-  sucursal              Sucursal
-  ubicacion             String?             @db.VarChar(150)
+  sucursal             Sucursal
+  ubicacion            String?             @db.VarChar(150)
 
-  responsableDirectoId  Int?
-  responsableDirecto    usuario?            @relation("ResponsableActivo", fields: [responsableDirectoId], references: [id])
+  responsableDirectoId Int?
+  responsableDirecto   usuario?            @relation("ResponsableActivo", fields: [responsableDirectoId], references: [id])
 
-  status                EstadoActivo        @default(ACTIVO)
+  status               EstadoActivo        @default(ACTIVO)
 
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
-  historialMovimientos  historial_activos[] @relation("ActivoHistorial")
+  historialMovimientos historial_activos[] @relation("ActivoHistorial")
 
+  @@index([numeroControl])
   @@index([responsableDirectoId], map: "activo_fijo_responsableDirectoId_fkey")
   @@index([sucursal])
+  @@index([tipoEquipo])
 }
-model historial_activos {
-  id               Int             @id @default(autoincrement())
-  activoId         Int
-  numeroControl    String          @db.VarChar(50)
-  descripcion      String?         @db.VarChar(150)
-  tipoMovimiento   TipoMovimiento
-  detalle          String?         @db.Text
-  sucursal         Sucursal
-  usuarioId        Int?
-  usuarioNombre    String?         @db.VarChar(100)
-  fecha            DateTime        @default(now())
 
-  activo           activo_fijo     @relation("ActivoHistorial", fields: [activoId], references: [id], onDelete: Cascade)
-  usuario          usuario?        @relation("UsuarioHistorialActivo", fields: [usuarioId], references: [id])
+model historial_activos {
+  id             Int             @id @default(autoincrement())
+  activoId       Int
+  numeroControl  String          @db.VarChar(100)
+  descripcion    String?         @db.VarChar(150)
+  tipoMovimiento TipoMovimiento
+  detalle        String?         @db.Text
+  sucursal       Sucursal
+  usuarioId      Int?
+  usuarioNombre  String?         @db.VarChar(100)
+  fecha          DateTime        @default(now())
+
+  activo         activo_fijo     @relation("ActivoHistorial", fields: [activoId], references: [id], onDelete: Cascade)
+  usuario        usuario?        @relation("UsuarioHistorialActivo", fields: [usuarioId], references: [id])
 
   @@index([activoId])
   @@index([sucursal])
@@ -75,10 +80,28 @@ model historial_activos {
   @@index([fecha])
 }
 
+model reporte {
+  id            Int         @id @default(autoincrement())
+  nombreArchivo String      @db.VarChar(255)
+  tipoArchivo   TipoReporte
+  rutaArchivo   String      @db.VarChar(255)
+  sucursal      Sucursal?
+  modulo        String?     @db.VarChar(100)
+  creadoPorId   Int?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  creadoPor     usuario?    @relation("UsuarioReporte", fields: [creadoPorId], references: [id])
+
+  @@index([sucursal])
+  @@index([creadoPorId])
+  @@index([createdAt])
+}
+
 enum Rol {
   ADMINISTRADOR
-  SUPERVISOR
-  CAPTURISTA
+  INVENTARIOS
+  AUXILIAR_INVENTARIOS
   CONSULTA
 }
 
@@ -88,6 +111,8 @@ enum Sucursal {
   CIUDAD_HIDALGO
   TUXTLA_GUTIERREZ
   OFICINAS_ADMINISTRATIVAS
+  ALMACEN_CIUDAD_HIDALGO
+  ALMACEN_TUXTLA_GUTIERREZ
 }
 
 enum EstadoActivo {
@@ -104,4 +129,16 @@ enum TipoMovimiento {
   CAMBIO_STATUS
   CAMBIO_UBICACION
   TRANSFERENCIA
+}
+
+enum TipoEquipoActivo {
+  EQUIPO_MOBILIARIO
+  EQUIPO_OFICINA
+  EQUIPO_REPARTO
+  EQUIPO_TRANSPORTE
+}
+
+enum TipoReporte {
+  EXCEL
+  PDF
 }

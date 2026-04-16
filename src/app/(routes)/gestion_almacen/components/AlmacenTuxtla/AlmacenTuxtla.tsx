@@ -6,13 +6,12 @@ interface Props {
   soloLectura?: boolean;
 }
 
-
-export function SucursalToscana({ soloLectura = false }: Props) {
+export function AlmacenTuxtla({ soloLectura = false }: Props) {
   return (
     <TarjetaSucursal
-      titulo="Sucursal Toscana"
-      imagen="/iconos/toscana.jpeg"
-      sucursal="TOSCANA"
+      titulo="Almacen Tuxtla Gutierrez"
+      imagen="/iconos/tuxtla.png"
+      sucursal="ALMACEN_TUXTLA_GUTIERREZ"
       soloLectura={soloLectura}
     />
   );

@@ -11,6 +11,15 @@ export const activoSchema = z.object({
     .min(1, "La descripción del activo es obligatoria")
     .max(150, "Máximo 150 caracteres"),
 
+  tipoEquipo: z.enum([
+    "EQUIPO_MOBILIARIO",
+    "EQUIPO_OFICINA",
+    "EQUIPO_REPARTO",
+    "EQUIPO_TRANSPORTE",
+  ], {
+    message: "El tipo de equipo es obligatorio",
+  }),
+
   existencia: z.coerce
     .number()
     .min(1, "La existencia debe ser mayor a 0"),
@@ -46,10 +55,12 @@ export const activoSchema = z.object({
 
   sucursal: z.enum([
     "TAPACHULA",
-    "TOSCANA",
     "CIUDAD_HIDALGO",
+    "TOSCANA",
     "TUXTLA_GUTIERREZ",
     "OFICINAS_ADMINISTRATIVAS",
+    "ALMACEN_CIUDAD_HIDALGO",
+    "ALMACEN_TUXTLA_GUTIERREZ",
   ]),
 
   ubicacion: z

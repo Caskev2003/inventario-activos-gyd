@@ -7,17 +7,21 @@ import BotonRefrescar from "./components/boton-refrescar/BotonRefrescar";
 
 type Sucursal =
   | "TAPACHULA"
-  | "TOSCANA"
   | "CIUDAD_HIDALGO"
+  | "TOSCANA"
   | "TUXTLA_GUTIERREZ"
-  | "OFICINAS_ADMINISTRATIVAS";
+  | "OFICINAS_ADMINISTRATIVAS"
+  | "ALMACEN_CIUDAD_HIDALGO"
+  | "ALMACEN_TUXTLA_GUTIERREZ";
 
 const SUCURSALES_VALIDAS: Sucursal[] = [
   "TAPACHULA",
-  "TOSCANA",
   "CIUDAD_HIDALGO",
+  "TOSCANA",
   "TUXTLA_GUTIERREZ",
   "OFICINAS_ADMINISTRATIVAS",
+  "ALMACEN_CIUDAD_HIDALGO",
+  "ALMACEN_TUXTLA_GUTIERREZ",
 ];
 
 function esSucursalValida(valor?: string): valor is Sucursal {
@@ -36,6 +40,10 @@ function formatearSucursal(sucursal: Sucursal) {
       return "Tuxtla Gutiérrez";
     case "OFICINAS_ADMINISTRATIVAS":
       return "Oficinas Administrativas";
+    case "ALMACEN_CIUDAD_HIDALGO":
+      return "Almacén Ciudad Hidalgo";
+    case "ALMACEN_TUXTLA_GUTIERREZ":
+      return "Almacén Tuxtla Gutiérrez";
     default:
       return sucursal;
   }
@@ -60,23 +68,25 @@ export default async function Page({ searchParams }: PageProps) {
     redirect("/gestion_almacen");
   }
 
+  const soloLectura = session.user.rol === "CONSULTA";
+
   return (
-    <div className="p-6 min-h-screen bg-[#2b2b2b]">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+    <div className="min-h-screen bg-[#2b2b2b] p-6">
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <Link
-            href="/gestion_almacen"
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-full text-sm"
+            href={soloLectura ? "/consulta" : "/gestion_almacen"}
+            className="rounded-full bg-gray-600 px-4 py-2 text-sm text-white hover:bg-gray-700"
           >
             ← Regresar
           </Link>
 
           <div>
             <h1 className="text-3xl font-bold text-white">
-              GESTIÓN DE ACTIVOS FIJOS
+              {soloLectura ? "CONSULTA DE ACTIVOS FIJOS" : "GESTIÓN DE ACTIVOS FIJOS"}
             </h1>
 
-            <p className="text-sm text-gray-300 mt-1">
+            <p className="mt-1 text-sm text-gray-300">
               Sucursal actual:{" "}
               <span className="font-semibold text-white">
                 {formatearSucursal(sucursal)}
@@ -85,20 +95,36 @@ export default async function Page({ searchParams }: PageProps) {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <BotonRefrescar />
-          <ImportarExcelActivos sucursal={sucursal} />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {!soloLectura && (
+            <>
+              <ImportarExcelActivos sucursal={sucursal} />
 
-          <Link
-            href={`/gestion_activos/components/registro-activos?sucursal=${sucursal}`}
-            className="bg-[#1e3a5f] text-white hover:bg-green-600 h-10 px-6 rounded-full inline-flex items-center justify-center"
-          >
-            Nuevo activo
-          </Link>
+              <Link
+                href={`/gestion_activos/reportes?sucursal=${sucursal}`}
+                className="inline-flex h-10 items-center justify-center rounded-full bg-[#0D0A62] px-6 text-white hover:bg-blue-600"
+              >
+                Reportes
+              </Link>
+
+              <Link
+                href={`/gestion_activos/components/registro-activos?sucursal=${sucursal}`}
+                className="inline-flex h-10 items-center justify-center rounded-full bg-[#1e3a5f] px-6 text-white hover:bg-green-600"
+              >
+                Nuevo activo
+              </Link>
+            </>
+          )}
+
+          <BotonRefrescar />
         </div>
       </div>
 
-      <TablaActivos sucursalFiltro={sucursal} />
+      <TablaActivos
+        sucursalFiltro={sucursal}
+        creadoPorId={session.user.id ? Number(session.user.id) : undefined}
+        soloLectura={soloLectura}
+      />
     </div>
   );
 }

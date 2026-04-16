@@ -1,14 +1,25 @@
-"use client"
-import { cn } from "@/lib/utils"
-import React from "react"
-import { itemsNavbar } from "@/data/itemsNavbar"
-import Link from "next/link"
-import { useScrollPosition } from "@/hooks/useScrollPosition"
+"use client";
+
+import { cn } from "@/lib/utils";
+import React from "react";
+import { itemsNavbar } from "@/data/itemsNavbar";
+import Link from "next/link";
+import Image from "next/image";
+import { useScrollPosition } from "@/hooks/useScrollPosition";
 import { UserProfileCard } from "@/components/shared/UserProfileCard"
-import Image from "next/image"
+import { useSession } from "next-auth/react";
 
 export function NavbarDesktop() {
-  const scrollPosition = useScrollPosition()
+  const scrollPosition = useScrollPosition();
+  const { data: session, status } = useSession();
+
+  if (status === "loading") return null;
+
+  const rol = session?.user?.rol ?? "";
+
+  const itemsPermitidos = itemsNavbar.filter((item) =>
+    item.roles.includes(rol)
+  );
 
   return (
     <div
@@ -17,29 +28,29 @@ export function NavbarDesktop() {
         scrollPosition > 20 ? "bg-black" : "bg-transparent"
       )}
     >
-      <div className="h-full bg-black px-2 md:px-4 lg:px-6 overflow-hidden">
+      <div className="h-full bg-black px-2 md:px-4 lg:px-6">
         <div className="flex h-full items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/"
-              className="flex h-14 w-[90px] items-center justify-center overflow-hidden"
+              className="flex h-14 w-[110px] items-center justify-center overflow-hidden"
             >
               <Image
-  src="/iconos/logo.jpeg"
-  alt="Distribución G&D"
-  width={110}
-  height={56}
-  className="h-full w-full object-contain"
-  priority
-/>
+                src="/iconos/logo.jpeg"
+                alt="Distribución G&D"
+                width={110}
+                height={56}
+                className="h-full w-full object-contain"
+                priority
+              />
             </Link>
 
-            <div className="ml-4 flex gap-4">
-              {itemsNavbar.map((item) => (
+            <div className="ml-4 flex gap-4 text-white">
+              {itemsPermitidos.map((item) => (
                 <Link
                   key={item.name}
                   href={item.link}
-                  className="transition-all duration-300 hover:text-green-700"
+                  className="hover:text-green-700 transition-all duration-300"
                 >
                   {item.name}
                 </Link>
@@ -47,9 +58,13 @@ export function NavbarDesktop() {
             </div>
           </div>
 
-          <UserProfileCard />
+          {session?.user && (
+            <div className="flex items-center">
+              <UserProfileCard />
+            </div>
+          )}
         </div>
       </div>
     </div>
-  )
+  );
 }

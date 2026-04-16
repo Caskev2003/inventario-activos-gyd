@@ -142,8 +142,8 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
                   className="w-full rounded-md border p-2 text-black bg-white"
                 >
                   <option value="ADMINISTRADOR">Administrador</option>
-                  <option value="SUPERVISOR">Supervisor</option>
-                  <option value="CAPTURISTA">Capturista</option>
+                  <option value="INVENTARIOS">Inventarios</option>
+                  <option value="AUXILIAR_INVENTARIOS">Auxiliar inventarios</option>
                   <option value="CONSULTA">Consulta</option>
                 </select>
               </FormControl>

@@ -5,9 +5,13 @@ import React from "react";
 import { itemsNavbar } from "@/data/itemsNavbar";
 import Link from "next/link";
 import { useScrollPosition } from "@/hooks/useScrollPosition";
+import { usePathname } from "next/navigation"; // 👈 IMPORTANTE
 
 export function NavbarDesktop() {
   const scrollPosition = useScrollPosition();
+  const pathname = usePathname(); // 👈 ruta actual
+
+  const esLogin = pathname === "/login";
 
   return (
     <div
@@ -17,6 +21,8 @@ export function NavbarDesktop() {
       )}
     >
       <div className="px-[4%] mx-auto h-full flex items-center justify-between bg-black">
+        
+        {/* LOGO */}
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center">
             <img
@@ -26,17 +32,20 @@ export function NavbarDesktop() {
             />
           </Link>
 
-          <div className="flex gap-4">
-            {itemsNavbar.map((item) => (
-              <Link
-                key={item.name}
-                href={item.link}
-                className="hover:text-green-500 transition-all duration-300"
-              >
-                {item.name}
-              </Link>
-            ))}
-          </div>
+          {/* 👇 SOLO SI NO ES LOGIN */}
+          {!esLogin && (
+            <div className="flex gap-4">
+              {itemsNavbar.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.link}
+                  className="hover:text-green-500 transition-all duration-300"
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
