@@ -1,21 +1,72 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { TipoReporte, Sucursal } from "@prisma/client";
+import { TipoReporte, Sucursal, EstadoActivo } from "@prisma/client";
 import ExcelJS from "exceljs";
 import fs from "fs";
 import path from "path";
+
+const ESTADOS_VALIDOS: EstadoActivo[] = [
+  "ACTIVO",
+  "INACTIVO",
+  "MANTENIMIENTO",
+  "BAJA",
+];
+
+function esEstadoValido(valor: string | null): valor is EstadoActivo {
+  return !!valor && ESTADOS_VALIDOS.includes(valor as EstadoActivo);
+}
+
+function formatearCondicionIngreso(condicion?: string | null) {
+  switch (condicion) {
+    case "NUEVO":
+      return "Nuevo";
+    case "REACONDICIONADO":
+      return "Reacondicionado";
+    case "USADO":
+      return "Usado";
+    case "DONADO":
+      return "Donado";
+    case "TRANSFERIDO":
+      return "Transferido";
+    default:
+      return "";
+  }
+}
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
     const sucursal = body?.sucursal as Sucursal | undefined;
+
+    const statusBody = body?.status ? String(body.status).trim() : null;
+    const status = esEstadoValido(statusBody) ? statusBody : undefined;
+
     const creadoPorId = body?.creadoPorId ? Number(body.creadoPorId) : null;
 
+    const where: {
+      sucursal?: Sucursal;
+      status?: EstadoActivo;
+    } = {};
+
+    if (sucursal) {
+      where.sucursal = sucursal;
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
     const activos = await db.activo_fijo.findMany({
-      where: sucursal ? { sucursal } : undefined,
+      where,
       include: {
-        responsableDirecto: true,
+        creadoPor: {
+          select: {
+            id: true,
+            nombre: true,
+            correo: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -23,6 +74,9 @@ export async function POST(req: Request) {
     });
 
     const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Distribución G&D";
+    workbook.created = new Date();
+
     const worksheet = workbook.addWorksheet("Activos fijos");
 
     const headers = [
@@ -33,11 +87,13 @@ export async function POST(req: Request) {
       "Medidas",
       "Modelo/Marca",
       "Serie",
-      "Condiciones",
+      "Condición de ingreso",
       "Observaciones",
       "Sucursal",
       "Ubicación",
       "Responsable",
+      "Cargo responsable",
+      "Dado de alta por",
       "Status",
       "Creado",
     ];
@@ -50,11 +106,13 @@ export async function POST(req: Request) {
       activo.medidas ?? "",
       activo.modeloMarca ?? "",
       activo.numeroSerie ?? "",
-      activo.condicionesActivo ?? "",
+      formatearCondicionIngreso(activo.condicionIngreso),
       activo.observaciones ?? "",
       (activo.sucursal ?? "").replaceAll("_", " "),
       activo.ubicacion ?? "",
-      activo.responsableDirecto?.nombre ?? "",
+      activo.responsableNombre ?? "",
+      activo.responsableCargo ?? "",
+      activo.creadoPor?.nombre ?? "",
       (activo.status ?? "").replaceAll("_", " "),
       activo.createdAt
         ? new Date(activo.createdAt).toLocaleDateString("es-MX")
@@ -62,7 +120,7 @@ export async function POST(req: Request) {
     ]);
 
     worksheet.addTable({
-      name: "TablaActivos",
+      name: `TablaActivos_${Date.now()}`,
       ref: "A1",
       headerRow: true,
       totalsRow: false,
@@ -84,7 +142,7 @@ export async function POST(req: Request) {
         if (len > max) max = len;
       }
 
-      worksheet.getColumn(c).width = Math.min(Math.max(max + 2, 12), 40);
+      worksheet.getColumn(c).width = Math.min(Math.max(max + 2, 12), 45);
     }
 
     worksheet.eachRow((row) => {
@@ -95,13 +153,19 @@ export async function POST(req: Request) {
       };
     });
 
-    const carpetaReportes = path.join(process.cwd(), "public", "reportes", "excel");
+    const carpetaReportes = path.join(
+      process.cwd(),
+      "public",
+      "reportes",
+      "excel"
+    );
 
     if (!fs.existsSync(carpetaReportes)) {
       fs.mkdirSync(carpetaReportes, { recursive: true });
     }
 
     const fecha = new Date();
+
     const fechaArchivo = `${fecha.getFullYear()}-${String(
       fecha.getMonth() + 1
     ).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}_${String(
@@ -110,26 +174,30 @@ export async function POST(req: Request) {
       fecha.getSeconds()
     ).padStart(2, "0")}`;
 
-    const nombreArchivo = `reporte_activos_${sucursal ?? "GENERAL"}_${fechaArchivo}.xlsx`;
+    const nombreSucursal = sucursal ?? "GENERAL";
+    const nombreStatus = status ?? "TODOS";
+
+    const nombreArchivo = `reporte_activos_${nombreSucursal}_${nombreStatus}_${fechaArchivo}.xlsx`;
+
     const rutaCompleta = path.join(carpetaReportes, nombreArchivo);
     const rutaPublica = `/reportes/excel/${nombreArchivo}`;
 
-    await workbook.xlsx.writeFile(rutaCompleta);
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    fs.writeFileSync(rutaCompleta, Buffer.from(buffer));
 
     await db.reporte.create({
       data: {
-        nombreArchivo: nombreArchivo,
+        nombreArchivo,
         tipoArchivo: TipoReporte.EXCEL,
         rutaArchivo: rutaPublica,
         sucursal: sucursal ?? null,
-        modulo: "INVENTARIO DE ACTIVOS",
-        creadoPorId: creadoPorId,
+        modulo: `INVENTARIO DE ACTIVOS${status ? ` - ${status}` : ""}`,
+        creadoPorId,
       },
     });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    return new NextResponse(buffer as BodyInit, {
+    return new NextResponse(Buffer.from(buffer), {
       status: 200,
       headers: {
         "Content-Type":

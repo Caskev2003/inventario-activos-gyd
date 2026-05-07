@@ -30,6 +30,20 @@ type Sucursal =
 
 type EstadoActivo = "ACTIVO" | "INACTIVO" | "MANTENIMIENTO" | "BAJA";
 
+type CondicionIngreso =
+  | "NUEVO"
+  | "REACONDICIONADO"
+  | "USADO"
+  | "DONADO"
+  | "TRANSFERIDO";
+
+interface ResponsableSucursal {
+  id: number;
+  sucursal: Sucursal;
+  nombreResponsable: string;
+  cargo?: string | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,6 +60,8 @@ export function ModalEditarActivo({
   const [loading, setLoading] = useState(false);
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [previewImagen, setPreviewImagen] = useState<string | null>(null);
+  const [responsableSucursal, setResponsableSucursal] =
+    useState<ResponsableSucursal | null>(null);
 
   const [formData, setFormData] = useState<{
     id: number;
@@ -56,12 +72,12 @@ export function ModalEditarActivo({
     medidas: string;
     modeloMarca: string;
     numeroSerie: string;
-    condicionesActivo: string;
+    condicionIngreso: CondicionIngreso;
     observaciones: string;
     imagenActivo: string;
     sucursal: Sucursal;
     ubicacion: string;
-    responsableDirectoId: number;
+    creadoPorId: number | null;
     status: EstadoActivo;
   }>({
     id: 0,
@@ -72,12 +88,12 @@ export function ModalEditarActivo({
     medidas: "",
     modeloMarca: "",
     numeroSerie: "",
-    condicionesActivo: "",
+    condicionIngreso: "NUEVO",
     observaciones: "",
     imagenActivo: "",
     sucursal: "TAPACHULA",
     ubicacion: "",
-    responsableDirectoId: 0,
+    creadoPorId: null,
     status: "ACTIVO",
   });
 
@@ -92,19 +108,53 @@ export function ModalEditarActivo({
         medidas: activo.medidas ?? "",
         modeloMarca: activo.modeloMarca ?? "",
         numeroSerie: activo.numeroSerie ?? "",
-        condicionesActivo: activo.condicionesActivo ?? "",
+        condicionIngreso: activo.condicionIngreso ?? "NUEVO",
         observaciones: activo.observaciones ?? "",
         imagenActivo: activo.imagenActivo ?? "",
         sucursal: activo.sucursal ?? "TAPACHULA",
         ubicacion: activo.ubicacion ?? "",
-        responsableDirectoId: Number(activo.responsableDirectoId ?? 0),
+        creadoPorId: activo.creadoPorId ?? null,
         status: activo.status ?? "ACTIVO",
       });
+
+      setResponsableSucursal(
+        activo.responsableNombre
+          ? {
+              id: 0,
+              sucursal: activo.sucursal,
+              nombreResponsable: activo.responsableNombre,
+              cargo: activo.responsableCargo ?? null,
+            }
+          : null
+      );
 
       setArchivoImagen(null);
       setPreviewImagen(null);
     }
   }, [activo]);
+
+  useEffect(() => {
+    const cargarResponsable = async () => {
+      if (!formData.sucursal) return;
+
+      try {
+        const { data } = await axios.get("/api/responsable-sucursal", {
+          params: {
+            sucursal: formData.sucursal,
+          },
+        });
+
+        setResponsableSucursal(data ?? null);
+      } catch (error) {
+        console.error("Error al cargar responsable:", error);
+        setResponsableSucursal(null);
+      }
+    };
+
+    if (open) {
+      cargarResponsable();
+    }
+  }, [formData.sucursal, open]);
 
   useEffect(() => {
     return () => {
@@ -121,10 +171,7 @@ export function ModalEditarActivo({
 
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        name === "existencia" || name === "responsableDirectoId"
-          ? Number(value)
-          : value,
+      [name]: name === "existencia" ? Number(value) : value,
     }));
   };
 
@@ -292,13 +339,19 @@ export function ModalEditarActivo({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm">Condiciones</label>
-            <Input
-              name="condicionesActivo"
-              value={formData.condicionesActivo}
+            <label className="mb-1 block text-sm">Condición de ingreso</label>
+            <select
+              name="condicionIngreso"
+              value={formData.condicionIngreso}
               onChange={handleChange}
-              className="bg-white text-black"
-            />
+              className="h-10 w-full rounded-md border bg-white px-3 text-black"
+            >
+              <option value="NUEVO">Nuevo</option>
+              <option value="REACONDICIONADO">Reacondicionado</option>
+              <option value="USADO">Usado</option>
+              <option value="DONADO">Donado</option>
+              <option value="TRANSFERIDO">Transferido</option>
+            </select>
           </div>
 
           <div>
@@ -323,9 +376,15 @@ export function ModalEditarActivo({
               <option value="CIUDAD_HIDALGO">Ciudad Hidalgo</option>
               <option value="TOSCANA">Toscana</option>
               <option value="TUXTLA_GUTIERREZ">Tuxtla Gutiérrez</option>
-              <option value="OFICINAS_ADMINISTRATIVAS">Oficinas Administrativas</option>
-              <option value="ALMACEN_CIUDAD_HIDALGO">Almacén Ciudad Hidalgo</option>
-              <option value="ALMACEN_TUXTLA_GUTIERREZ">Almacén Tuxtla Gutiérrez</option>
+              <option value="OFICINAS_ADMINISTRATIVAS">
+                Oficinas Administrativas
+              </option>
+              <option value="ALMACEN_CIUDAD_HIDALGO">
+                Almacén Ciudad Hidalgo
+              </option>
+              <option value="ALMACEN_TUXTLA_GUTIERREZ">
+                Almacén Tuxtla Gutiérrez
+              </option>
             </select>
           </div>
 
@@ -342,6 +401,38 @@ export function ModalEditarActivo({
               <option value="MANTENIMIENTO">Mantenimiento</option>
               <option value="BAJA">Baja</option>
             </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm">
+              Responsable directo de la sucursal
+            </label>
+            <Input
+              readOnly
+              value={
+                responsableSucursal
+                  ? `${responsableSucursal.nombreResponsable}${
+                      responsableSucursal.cargo
+                        ? ` - ${responsableSucursal.cargo}`
+                        : ""
+                    }`
+                  : "Sin responsable asignado para esta sucursal"
+              }
+              className="bg-zinc-300 text-black"
+            />
+            <p className="mt-1 text-xs text-gray-300">
+              Si cambias la sucursal, se tomará automáticamente el responsable
+              asignado a esa sucursal.
+            </p>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm">Dado de alta por</label>
+            <Input
+              readOnly
+              value={activo.creadoPor?.nombre || "Sin dato"}
+              className="bg-zinc-300 text-black"
+            />
           </div>
 
           <div className="md:col-span-2">
@@ -370,7 +461,9 @@ export function ModalEditarActivo({
                 <p className="mb-2 text-sm text-gray-300">Imagen actual:</p>
                 {formData.imagenActivo ? (
                   <img
-                    src={`/api/activos/imagen/${encodeURIComponent(formData.imagenActivo)}`}
+                    src={`/api/activos/imagen/${encodeURIComponent(
+                      formData.imagenActivo
+                    )}`}
                     alt={formData.descripcionActivo}
                     className="h-36 w-36 rounded-lg border border-gray-600 bg-white object-cover"
                   />
@@ -382,7 +475,9 @@ export function ModalEditarActivo({
               </div>
 
               <div>
-                <p className="mb-2 text-sm text-gray-300">Nueva vista previa:</p>
+                <p className="mb-2 text-sm text-gray-300">
+                  Nueva vista previa:
+                </p>
                 {previewImagen ? (
                   <img
                     src={previewImagen}

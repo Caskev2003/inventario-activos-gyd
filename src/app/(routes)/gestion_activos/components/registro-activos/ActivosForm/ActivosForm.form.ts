@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const activoSchema = z.object({
   numeroControl: z
@@ -11,24 +11,21 @@ export const activoSchema = z.object({
     .min(1, "La descripción del activo es obligatoria")
     .max(150, "Máximo 150 caracteres"),
 
-  tipoEquipo: z.enum([
-    "EQUIPO_MOBILIARIO",
-    "EQUIPO_OFICINA",
-    "EQUIPO_REPARTO",
-    "EQUIPO_TRANSPORTE",
-  ], {
-    message: "El tipo de equipo es obligatorio",
-  }),
+  tipoEquipo: z.enum(
+    [
+      "EQUIPO_MOBILIARIO",
+      "EQUIPO_OFICINA",
+      "EQUIPO_REPARTO",
+      "EQUIPO_TRANSPORTE",
+    ],
+    {
+      message: "El tipo de equipo es obligatorio",
+    }
+  ),
 
-  existencia: z.coerce
-    .number()
-    .min(1, "La existencia debe ser mayor a 0"),
+  existencia: z.coerce.number().min(1, "La existencia debe ser mayor a 0"),
 
-  medidas: z
-    .string()
-    .max(100, "Máximo 100 caracteres")
-    .optional()
-    .or(z.literal("")),
+  medidas: z.string().max(100, "Máximo 100 caracteres").optional().or(z.literal("")),
 
   modeloMarca: z
     .string()
@@ -42,16 +39,14 @@ export const activoSchema = z.object({
     .optional()
     .or(z.literal("")),
 
-  condicionesActivo: z
-    .string()
-    .max(150, "Máximo 150 caracteres")
-    .optional()
-    .or(z.literal("")),
+  condicionIngreso: z.enum(
+    ["NUEVO", "REACONDICIONADO", "USADO", "DONADO", "TRANSFERIDO"],
+    {
+      message: "La condición de ingreso es obligatoria",
+    }
+  ),
 
-  observaciones: z
-    .string()
-    .optional()
-    .or(z.literal("")),
+  observaciones: z.string().optional().or(z.literal("")),
 
   sucursal: z.enum([
     "TAPACHULA",
@@ -73,12 +68,7 @@ export const activoSchema = z.object({
     .number()
     .min(1, "El responsable directo es obligatorio"),
 
-  status: z.enum([
-    "ACTIVO",
-    "INACTIVO",
-    "MANTENIMIENTO",
-    "BAJA",
-  ]),
-})
+  status: z.enum(["ACTIVO", "INACTIVO", "MANTENIMIENTO", "BAJA"]),
+});
 
-export type ActivosFormValues = z.infer<typeof activoSchema>
+export type ActivosFormValues = z.infer<typeof activoSchema>;

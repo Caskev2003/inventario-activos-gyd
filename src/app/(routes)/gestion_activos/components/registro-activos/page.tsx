@@ -79,7 +79,11 @@ export default async function Page({ searchParams }: PageProps) {
           </span>
         </p>
 
-        <ActivosForm />
+        <ActivosForm
+          sucursal={sucursal}
+          creadoPorId={session.user.id ? Number(session.user.id) : undefined}
+          creadoPorNombre={session.user.name ?? "Usuario actual"}
+        />
       </div>
     </div>
   );

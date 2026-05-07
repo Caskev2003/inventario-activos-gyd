@@ -4,8 +4,8 @@ import { db } from "@/lib/db";
 import {
   EstadoActivo,
   Sucursal,
-  TipoMovimiento,
   TipoEquipoActivo,
+  CondicionIngreso,
 } from "@prisma/client";
 import { auth } from "../../../../../auth";
 
@@ -19,9 +19,10 @@ type RegistroImportado = {
   medidas: string | null;
   modeloMarca: string | null;
   numeroSerie: string | null;
-  condicionesActivo: string | null;
+  condicionIngreso: CondicionIngreso;
   observaciones: string | null;
   ubicacion: string | null;
+  seccionExcel: string | null;
   status: EstadoActivo;
 };
 
@@ -115,6 +116,18 @@ function mapStatus(valor: unknown): EstadoActivo {
   if (texto.includes("BAJA")) return "BAJA";
 
   return "ACTIVO";
+}
+
+function mapCondicionIngreso(valor: unknown): CondicionIngreso {
+  const texto = normalizarComparacion(valor);
+
+  if (texto.includes("REACONDICIONADO")) return "REACONDICIONADO";
+  if (texto.includes("USADO")) return "USADO";
+  if (texto.includes("DONADO")) return "DONADO";
+  if (texto.includes("TRANSFERIDO")) return "TRANSFERIDO";
+  if (texto.includes("NUEVO")) return "NUEVO";
+
+  return "NUEVO";
 }
 
 function extraerContextoHoja(
@@ -304,14 +317,18 @@ function construirMapaEncabezados(headerRow: ExcelRow) {
       mapa.set("modeloMarca", index);
     } else if (t.includes("NUMERO DE SERIE")) {
       mapa.set("numeroSerie", index);
-    } else if (t.includes("CONDICIONES DEL ACTIVO")) {
-      mapa.set("condicionesActivo", index);
+    } else if (
+      t.includes("CONDICIONES DEL ACTIVO") ||
+      t.includes("CONDICION DE INGRESO") ||
+      t.includes("CONDICIÓN DE INGRESO") ||
+      t === "CONDICION" ||
+      t === "CONDICIÓN"
+    ) {
+      mapa.set("condicionIngreso", index);
     } else if (t === "OBSERVACIONES") {
       mapa.set("observaciones", index);
     } else if (t === "UBICACION") {
       mapa.set("ubicacion", index);
-    } else if (t.includes("RESPONSABLE DIRECTO")) {
-      mapa.set("responsableDirecto", index);
     } else if (t === "STATUS" || t === "ESTATUS") {
       mapa.set("status", index);
     }
@@ -324,6 +341,41 @@ function obtenerCelda(row: ExcelRow, mapa: Map<string, number>, campo: string) {
   const idx = mapa.get(campo);
   if (idx === undefined) return "";
   return row[idx];
+}
+
+function esFilaSeccionOficinas(row: ExcelRow): string | null {
+  const celdasConTexto = row.map(normalizarTexto).filter(Boolean);
+
+  if (celdasConTexto.length === 0) return null;
+  if (celdasConTexto.length > 3) return null;
+
+  const textoVisible = celdasConTexto.join(" ");
+  const texto = normalizarComparacion(textoVisible);
+
+  if (!texto) return null;
+
+  const textosIgnorar = [
+    "RELACION DE MOBILIARIO",
+    "MOBILIARIO Y EQUIPO",
+    "DISTRIBUCION G&D",
+    "DISTRIBUCION GYD",
+    "NUMERO DE CONTROL",
+    "DESCRIPCION DEL ACTIVO",
+    "EXISTENCIA",
+    "MEDIDAS",
+    "MODELO",
+    "NUMERO DE SERIE",
+    "CONDICIONES DEL ACTIVO",
+    "OBSERVACIONES",
+    "UBICACION",
+    "STATUS",
+    "FECHA",
+    "RESPONSABLE",
+  ];
+
+  if (textosIgnorar.some((t) => texto.includes(t))) return null;
+
+  return truncar(textoVisible, 191);
 }
 
 function extraerRegistrosDesdeSheet(
@@ -341,6 +393,8 @@ function extraerRegistrosDesdeSheet(
   const registros: RegistroImportado[] = [];
   let mapaEncabezados: Map<string, number> | null = null;
   let dentroDeTabla = false;
+  let seccionExcelActual: string | null = null;
+
   let tipoEquipoActual: TipoEquipoActivo | null =
     detectarTipoEquipoPorContextoHoja(
       sheet,
@@ -357,6 +411,15 @@ function extraerRegistrosDesdeSheet(
       mapaEncabezados = null;
       dentroDeTabla = false;
       continue;
+    }
+
+    if (sucursalDetectada === "OFICINAS_ADMINISTRATIVAS") {
+      const seccionDetectada = esFilaSeccionOficinas(row);
+
+      if (seccionDetectada && !esFilaEncabezado(row)) {
+        seccionExcelActual = seccionDetectada;
+        continue;
+      }
     }
 
     if (esFilaEncabezado(row)) {
@@ -403,9 +466,8 @@ function extraerRegistrosDesdeSheet(
       100
     );
 
-    const condicionesActivo = truncar(
-      limpiarTexto(obtenerCelda(row, mapaEncabezados, "condicionesActivo")),
-      150
+    const condicionIngreso = mapCondicionIngreso(
+      obtenerCelda(row, mapaEncabezados, "condicionIngreso")
     );
 
     const observaciones = limpiarTexto(
@@ -417,9 +479,7 @@ function extraerRegistrosDesdeSheet(
       150
     );
 
-    const status = mapStatus(
-      obtenerCelda(row, mapaEncabezados, "status")
-    );
+    const status = mapStatus(obtenerCelda(row, mapaEncabezados, "status"));
 
     if (!numeroControl || !descripcionActivo) {
       continue;
@@ -433,9 +493,13 @@ function extraerRegistrosDesdeSheet(
       medidas,
       modeloMarca,
       numeroSerie,
-      condicionesActivo,
+      condicionIngreso,
       observaciones,
       ubicacion,
+      seccionExcel:
+        sucursalDetectada === "OFICINAS_ADMINISTRATIVAS"
+          ? seccionExcelActual
+          : null,
       status,
     });
   }
@@ -450,6 +514,7 @@ function construirClaveRegistro(params: {
   sucursal: Sucursal;
   tipoEquipo: TipoEquipoActivo;
   observaciones: string | null;
+  seccionExcel?: string | null;
 }) {
   const numeroControlNormalizado = normalizarComparacion(params.numeroControl);
 
@@ -463,11 +528,14 @@ function construirClaveRegistro(params: {
       normalizarComparacion(params.ubicacion ?? ""),
       params.sucursal,
       params.tipoEquipo,
+      normalizarComparacion(params.seccionExcel ?? ""),
       normalizarComparacion(params.observaciones ?? ""),
     ].join("||");
   }
 
-  return [normalizarComparacion(params.numeroControl), params.sucursal].join("||");
+  return [normalizarComparacion(params.numeroControl), params.sucursal].join(
+    "||"
+  );
 }
 
 async function buscarActivoExistente(params: {
@@ -477,6 +545,7 @@ async function buscarActivoExistente(params: {
   sucursal: Sucursal;
   tipoEquipo: TipoEquipoActivo;
   observaciones: string | null;
+  seccionExcel?: string | null;
 }) {
   const numeroControlNormalizado = params.numeroControl.trim().toUpperCase();
 
@@ -492,6 +561,7 @@ async function buscarActivoExistente(params: {
         sucursal: params.sucursal,
         tipoEquipo: params.tipoEquipo,
         observaciones: params.observaciones,
+        seccionExcel: params.seccionExcel ?? null,
       },
       select: {
         id: true,
@@ -519,10 +589,7 @@ export async function POST(req: Request) {
     const session = await auth();
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "No autorizado." },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "No autorizado." }, { status: 401 });
     }
 
     const usuarioId = Number(session.user.id);
@@ -570,6 +637,22 @@ export async function POST(req: Request) {
       );
     }
 
+    const responsableSucursal = await db.responsable_sucursal.findUnique({
+      where: {
+        sucursal: sucursalForm,
+      },
+    });
+
+    if (!responsableSucursal) {
+      return NextResponse.json(
+        {
+          message:
+            "No hay responsable asignado para esta sucursal. Primero registra un responsable.",
+        },
+        { status: 400 }
+      );
+    }
+
     const bytes = await fileEntry.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -584,6 +667,20 @@ export async function POST(req: Request) {
     for (const nombreHoja of workbook.SheetNames) {
       const sheet = workbook.Sheets[nombreHoja];
       const sucursalDetectada = detectarSucursal(sheet, nombreHoja, sucursalForm);
+
+      const responsableHoja = await db.responsable_sucursal.findUnique({
+        where: {
+          sucursal: sucursalDetectada,
+        },
+      });
+
+      if (!responsableHoja) {
+        totalErrores++;
+        errores.push(
+          `Hoja "${nombreHoja}": No hay responsable asignado para la sucursal ${sucursalDetectada}.`
+        );
+        continue;
+      }
 
       const registros = extraerRegistrosDesdeSheet(
         sheet,
@@ -601,6 +698,7 @@ export async function POST(req: Request) {
             sucursal: sucursalDetectada,
             tipoEquipo: item.tipoEquipo,
             observaciones: item.observaciones,
+            seccionExcel: item.seccionExcel,
           });
 
           clavesExcel.add(claveActual);
@@ -612,6 +710,7 @@ export async function POST(req: Request) {
             sucursal: sucursalDetectada,
             tipoEquipo: item.tipoEquipo,
             observaciones: item.observaciones,
+            seccionExcel: item.seccionExcel,
           });
 
           let numeroSerieFinal = item.numeroSerie;
@@ -654,12 +753,15 @@ export async function POST(req: Request) {
                 medidas: item.medidas,
                 modeloMarca: item.modeloMarca,
                 numeroSerie: numeroSerieFinal,
-                condicionesActivo: item.condicionesActivo,
+                condicionIngreso: item.condicionIngreso,
                 observaciones: observacionesFinal,
                 ubicacion: item.ubicacion,
-                responsableDirectoId: usuarioExiste.id,
+                seccionExcel: item.seccionExcel,
                 status: item.status,
                 sucursal: sucursalDetectada,
+                responsableNombre: responsableHoja.nombreResponsable,
+                responsableCargo: responsableHoja.cargo,
+                creadoPorId: usuarioExiste.id,
               },
             });
 
@@ -674,12 +776,15 @@ export async function POST(req: Request) {
                 medidas: item.medidas,
                 modeloMarca: item.modeloMarca,
                 numeroSerie: numeroSerieFinal,
-                condicionesActivo: item.condicionesActivo,
+                condicionIngreso: item.condicionIngreso,
                 observaciones: observacionesFinal,
                 ubicacion: item.ubicacion,
-                responsableDirectoId: usuarioExiste.id,
+                seccionExcel: item.seccionExcel,
                 status: item.status,
                 sucursal: sucursalDetectada,
+                responsableNombre: responsableHoja.nombreResponsable,
+                responsableCargo: responsableHoja.cargo,
+                creadoPorId: usuarioExiste.id,
               },
             });
 
@@ -708,6 +813,7 @@ export async function POST(req: Request) {
         sucursal: true,
         tipoEquipo: true,
         observaciones: true,
+        seccionExcel: true,
       },
     });
 
@@ -721,6 +827,7 @@ export async function POST(req: Request) {
         sucursal: activo.sucursal,
         tipoEquipo: activo.tipoEquipo,
         observaciones: activo.observaciones,
+        seccionExcel: activo.seccionExcel,
       });
 
       if (!clavesExcel.has(claveDB)) {
@@ -729,9 +836,12 @@ export async function POST(req: Request) {
     }
 
     if (idsParaEliminar.length > 0) {
-      await db.activo_fijo.deleteMany({
+      await db.activo_fijo.updateMany({
         where: {
           id: { in: idsParaEliminar },
+        },
+        data: {
+          status: "BAJA",
         },
       });
 
@@ -739,11 +849,11 @@ export async function POST(req: Request) {
     }
 
     console.log("✅ RESULTADO FINAL:", {
-  insertados: totalInsertados,
-  actualizados: totalActualizados,
-  eliminados: totalEliminados,
-  errores: totalErrores
-});
+      insertados: totalInsertados,
+      actualizados: totalActualizados,
+      eliminados: totalEliminados,
+      errores: totalErrores,
+    });
 
     return NextResponse.json({
       message: "Importación finalizada.",
@@ -764,5 +874,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-  
 }

@@ -29,6 +29,19 @@ type Sucursal =
   | "ALMACEN_CIUDAD_HIDALGO"
   | "ALMACEN_TUXTLA_GUTIERREZ";
 
+interface Props {
+  sucursal?: Sucursal;
+  creadoPorId?: number;
+  creadoPorNombre?: string;
+}
+
+type ResponsableSucursal = {
+  id: number;
+  sucursal: Sucursal;
+  nombreResponsable: string;
+  cargo?: string | null;
+};
+
 const SUCURSALES_VALIDAS: Sucursal[] = [
   "TAPACHULA",
   "CIUDAD_HIDALGO",
@@ -39,7 +52,7 @@ const SUCURSALES_VALIDAS: Sucursal[] = [
   "ALMACEN_TUXTLA_GUTIERREZ",
 ];
 
-function esSucursalValida(valor: string | null): valor is Sucursal {
+function esSucursalValida(valor: string | null | undefined): valor is Sucursal {
   return !!valor && SUCURSALES_VALIDAS.includes(valor as Sucursal);
 }
 
@@ -64,7 +77,7 @@ function formatearSucursal(sucursal: Sucursal) {
   }
 }
 
-export function ActivosForm() {
+export function ActivosForm({ sucursal, creadoPorId, creadoPorNombre }: Props) {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -73,12 +86,25 @@ export function ActivosForm() {
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [previewImagen, setPreviewImagen] = useState<string | null>(null);
   const [codigoBarras, setCodigoBarras] = useState("");
+  const [responsableSucursal, setResponsableSucursal] =
+    useState<ResponsableSucursal | null>(null);
+  const [cargandoResponsable, setCargandoResponsable] = useState(false);
 
   const sucursalDesdeUrl = searchParams.get("sucursal");
 
   const sucursalActual: Sucursal = useMemo(() => {
-    return esSucursalValida(sucursalDesdeUrl) ? sucursalDesdeUrl : "TAPACHULA";
-  }, [sucursalDesdeUrl]);
+    if (esSucursalValida(sucursal)) return sucursal;
+    if (esSucursalValida(sucursalDesdeUrl)) return sucursalDesdeUrl;
+    return "TAPACHULA";
+  }, [sucursal, sucursalDesdeUrl]);
+
+  const usuarioLogueadoId =
+    creadoPorId && creadoPorId > 0
+      ? creadoPorId
+      : Number(session?.user?.id ?? 0);
+
+  const usuarioLogueadoNombre =
+    creadoPorNombre || session?.user?.name || "Usuario actual";
 
   const form = useForm<ActivosFormValues>({
     resolver: zodResolver(activoSchema),
@@ -90,11 +116,10 @@ export function ActivosForm() {
       medidas: "",
       modeloMarca: "",
       numeroSerie: "",
-      condicionesActivo: "",
+      condicionIngreso: "NUEVO",
       observaciones: "",
       sucursal: sucursalActual,
       ubicacion: "",
-      responsableDirectoId: 0,
       status: "ACTIVO",
     },
   });
@@ -104,12 +129,27 @@ export function ActivosForm() {
   }, [sucursalActual, form]);
 
   useEffect(() => {
-    const userId = Number(session?.user?.id);
+    const cargarResponsable = async () => {
+      try {
+        setCargandoResponsable(true);
 
-    if (!isNaN(userId) && userId > 0) {
-      form.setValue("responsableDirectoId", userId);
-    }
-  }, [session?.user?.id, form]);
+        const { data } = await axios.get("/api/responsable-sucursal", {
+          params: {
+            sucursal: sucursalActual,
+          },
+        });
+
+        setResponsableSucursal(data ?? null);
+      } catch (error) {
+        console.error("Error al cargar responsable:", error);
+        setResponsableSucursal(null);
+      } finally {
+        setCargandoResponsable(false);
+      }
+    };
+
+    cargarResponsable();
+  }, [sucursalActual]);
 
   useEffect(() => {
     return () => {
@@ -139,8 +179,7 @@ export function ActivosForm() {
     setArchivoImagen(file);
 
     if (file) {
-      const previewUrl = URL.createObjectURL(file);
-      setPreviewImagen(previewUrl);
+      setPreviewImagen(URL.createObjectURL(file));
     } else {
       setPreviewImagen(null);
     }
@@ -163,67 +202,94 @@ export function ActivosForm() {
 
     return data.fileName as string;
   };
+
 const imprimirEtiqueta = () => {
   const contenido = document.getElementById("area-etiqueta");
+
   if (!contenido || !codigoBarras.trim()) return;
 
-  const ventana = window.open("", "_blank", "width=400,height=300");
+  const ventana = window.open("", "_blank", "width=600,height=400");
+
   if (!ventana) return;
 
+  // CLON REAL DEL NODO
+  const contenidoHTML = contenido.outerHTML;
+
   ventana.document.write(`
+    <!DOCTYPE html>
     <html>
       <head>
         <title>Etiqueta</title>
+
         <style>
           @page {
             size: 50.8mm 25.4mm;
             margin: 0;
           }
 
-          html, body {
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          html,
+          body {
             width: 50.8mm;
             height: 25.4mm;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: white;
+            background: #ffffff;
           }
 
           body {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            align-items: flex-start;
+            justify-content: flex-start;
           }
 
-          .etiqueta {
-            width: 50.8mm;
-            height: 25.4mm;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+          #area-etiqueta {
+            width: 50.8mm !important;
+            height: 25.4mm !important;
+            overflow: hidden !important;
+          }
+
+          svg {
+            width: 100% !important;
+            overflow: visible !important;
+            shape-rendering: crispEdges !important;
+            text-rendering: geometricPrecision !important;
+          }
+
+          img {
+            image-rendering: pixelated !important;
           }
         </style>
       </head>
+
       <body>
-        <div class="etiqueta">
-          ${contenido.innerHTML}
-        </div>
+        ${contenidoHTML}
 
         <script>
           let yaImprimio = false;
 
-          function imprimirUnaSolaVez() {
+          function imprimir() {
             if (yaImprimio) return;
+
             yaImprimio = true;
 
             setTimeout(() => {
+              window.focus();
               window.print();
-              setTimeout(() => window.close(), 300);
-            }, 300);
+
+              setTimeout(() => {
+                window.close();
+              }, 500);
+            }, 700);
           }
 
-          window.addEventListener("load", imprimirUnaSolaVez);
+          window.onload = imprimir;
         </script>
       </body>
     </html>
@@ -231,9 +297,20 @@ const imprimirEtiqueta = () => {
 
   ventana.document.close();
 };
+
   const onSubmit = async (values: ActivosFormValues) => {
     try {
       setIsSubmitting(true);
+
+      if (!usuarioLogueadoId || usuarioLogueadoId < 1) {
+        throw new Error("No se pudo obtener el usuario logueado.");
+      }
+
+      if (!responsableSucursal) {
+        throw new Error(
+          "No hay responsable asignado para esta sucursal. Primero registra un responsable."
+        );
+      }
 
       let imagenActivo: string | null = null;
 
@@ -245,9 +322,7 @@ const imprimirEtiqueta = () => {
         ...values,
         numeroControl: values.numeroControl.toUpperCase(),
         sucursal: sucursalActual,
-        responsableDirectoId: Number(
-          session?.user?.id ?? values.responsableDirectoId
-        ),
+        creadoPorId: usuarioLogueadoId,
         imagenActivo,
       };
 
@@ -265,11 +340,10 @@ const imprimirEtiqueta = () => {
         medidas: "",
         modeloMarca: "",
         numeroSerie: "",
-        condicionesActivo: "",
+        condicionIngreso: "NUEVO",
         observaciones: "",
         sucursal: sucursalActual,
         ubicacion: "",
-        responsableDirectoId: Number(session?.user?.id ?? 0),
         status: "ACTIVO",
       });
 
@@ -285,6 +359,7 @@ const imprimirEtiqueta = () => {
       router.refresh();
     } catch (error: any) {
       console.error(error);
+
       toast({
         title: "Error",
         description:
@@ -317,9 +392,7 @@ const imprimirEtiqueta = () => {
           name="numeroControl"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm text-white">
-                Número de control
-              </FormLabel>
+              <FormLabel className="text-sm text-white">Número de control</FormLabel>
               <FormControl>
                 <Input
                   {...field}
@@ -424,9 +497,7 @@ const imprimirEtiqueta = () => {
           name="modeloMarca"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm text-white">
-                Modelo / Marca
-              </FormLabel>
+              <FormLabel className="text-sm text-white">Modelo / Marca</FormLabel>
               <FormControl>
                 <Input
                   {...field}
@@ -461,17 +532,22 @@ const imprimirEtiqueta = () => {
 
         <FormField
           control={form.control}
-          name="condicionesActivo"
+          name="condicionIngreso"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm text-white">Condiciones</FormLabel>
+              <FormLabel className="text-sm text-white">Condición de ingreso</FormLabel>
               <FormControl>
-                <Input
+                <select
                   {...field}
-                  value={field.value ?? ""}
-                  className="h-9 bg-white text-sm text-black"
+                  className="h-9 w-full rounded-md border bg-white px-3 text-sm text-black"
                   disabled={isSubmitting}
-                />
+                >
+                  <option value="NUEVO">Nuevo</option>
+                  <option value="REACONDICIONADO">Reacondicionado</option>
+                  <option value="USADO">Usado</option>
+                  <option value="DONADO">Donado</option>
+                  <option value="TRANSFERIDO">Transferido</option>
+                </select>
               </FormControl>
               <FormMessage className="text-xs text-red-400" />
             </FormItem>
@@ -539,34 +615,40 @@ const imprimirEtiqueta = () => {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="responsableDirectoId"
-          render={() => (
-            <FormItem className="md:col-span-2">
-              <FormLabel className="text-sm text-white">
-                Responsable directo
-              </FormLabel>
-              <FormControl>
-                <Input
-                  readOnly
-                  value={`${session?.user?.id ?? ""} - ${session?.user?.name ?? ""}`}
-                  className="h-9 bg-zinc-300 text-sm text-black"
-                />
-              </FormControl>
-              <FormMessage className="text-xs text-red-400" />
-            </FormItem>
-          )}
-        />
+        <div className="md:col-span-2">
+          <FormLabel className="text-sm text-white">
+            Responsable directo de la sucursal
+          </FormLabel>
+          <Input
+            readOnly
+            value={
+              cargandoResponsable
+                ? "Cargando responsable..."
+                : responsableSucursal
+                ? `${responsableSucursal.nombreResponsable}${
+                    responsableSucursal.cargo ? ` - ${responsableSucursal.cargo}` : ""
+                  }`
+                : "Sin responsable asignado para esta sucursal"
+            }
+            className="mt-2 h-9 bg-zinc-300 text-sm text-black"
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <FormLabel className="text-sm text-white">Dado de alta por</FormLabel>
+          <Input
+            readOnly
+            value={`${usuarioLogueadoId || ""} - ${usuarioLogueadoNombre}`}
+            className="mt-2 h-9 bg-zinc-300 text-sm text-black"
+          />
+        </div>
 
         <FormField
           control={form.control}
           name="observaciones"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
-              <FormLabel className="text-sm text-white">
-                Observaciones
-              </FormLabel>
+              <FormLabel className="text-sm text-white">Observaciones</FormLabel>
               <FormControl>
                 <textarea
                   {...field}
@@ -602,7 +684,7 @@ const imprimirEtiqueta = () => {
               />
 
               <p className="mt-2 text-xs text-gray-300">
-                La etiqueta se imprimirá en formato 70mm x 30mm.
+                La etiqueta se imprimirá en formato 50.8mm x 25.4mm.
               </p>
 
               <div className="mt-4">
@@ -618,8 +700,10 @@ const imprimirEtiqueta = () => {
             </div>
 
             <div>
-              <p className="mb-2 text-sm text-gray-300">Vista previa de etiqueta:</p>
-              <div className="overflow-auto rounded-lg border border-gray-600 bg-white p-3">
+              <p className="mb-2 text-sm text-gray-300">
+                Vista previa de etiqueta:
+              </p>
+              <div className="overflow-auto rounded-lg border border-gray-600 bg-white p-2">
                 <div id="area-etiqueta">
                   <BarcodePreview value={codigoBarras} />
                 </div>
@@ -630,9 +714,7 @@ const imprimirEtiqueta = () => {
 
         <div className="md:col-span-2">
           <FormItem>
-            <FormLabel className="text-sm text-white">
-              Imagen del activo
-            </FormLabel>
+            <FormLabel className="text-sm text-white">Imagen del activo</FormLabel>
             <FormControl>
               <Input
                 type="file"
@@ -669,7 +751,7 @@ const imprimirEtiqueta = () => {
           <Button
             type="submit"
             className="h-9 bg-[#1e3a5f] px-8 text-sm hover:bg-green-600"
-            disabled={isSubmitting}
+            disabled={isSubmitting || cargandoResponsable || !responsableSucursal}
           >
             {isSubmitting ? "Guardando..." : "Registrar activo"}
           </Button>

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import JsBarcode from "jsbarcode";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   value: string;
@@ -14,84 +14,110 @@ function limpiarTexto(valor: string) {
     .replace(/\r/g, "")
     .replace(/\n/g, "")
     .replace(/\t/g, " ")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+    .toUpperCase();
 }
 
 export default function BarcodePreview({ value }: Props) {
-  const svgRef = useRef<SVGSVGElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [barcodeUrl, setBarcodeUrl] = useState("");
+
+  const textoLimpio = limpiarTexto(value || "SIN-CODIGO");
 
   useEffect(() => {
-    if (!svgRef.current) return;
-
-    const texto = limpiarTexto(value || "SIN-CODIGO");
+    if (!canvasRef.current) return;
 
     try {
-      JsBarcode(svgRef.current, texto, {
+      JsBarcode(canvasRef.current, textoLimpio, {
         format: "CODE128",
         displayValue: false,
-        margin: 3,          // importante: deja aire a los lados
-        width: 1.6,         // no tan delgado, no tan grueso
-        height: 120,        // alto suficiente para el lector
+
+        // Zona blanca para que el lector detecte inicio y fin
+        margin: 10,
+        marginLeft: 12,
+        marginRight: 12,
+        marginTop: 0,
+        marginBottom: 0,
+
+        // Barras más finas y legibles
+        width: 1,
+        height: 90,
+
         lineColor: "#000000",
         background: "#ffffff",
         flat: true,
       });
+
+      setBarcodeUrl(canvasRef.current.toDataURL("image/png"));
     } catch {
-      svgRef.current.innerHTML = "";
+      setBarcodeUrl("");
     }
-  }, [value]);
+  }, [textoLimpio]);
 
   return (
     <div
       style={{
         width: "50.8mm",
         height: "25.4mm",
-        background: "#fff",
-        padding: "0.5mm 0.8mm 0.4mm 0.5mm",
+        background: "#ffffff",
+        padding: "0.6mm 1mm 0.8mm 1mm",
         boxSizing: "border-box",
         fontFamily: "Arial, Helvetica, sans-serif",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
+        color: "#000000",
         overflow: "hidden",
       }}
     >
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+
+      <div
+        style={{
+          textAlign: "center",
+          fontWeight: 900,
+          fontSize: "9px",
+          lineHeight: 0.95,
+          letterSpacing: "0.3px",
+          marginBottom: "0.8mm",
+          whiteSpace: "nowrap",
+        }}
+      >
+        DISTRIBUCION G&amp;D S.A. DE C.V
+      </div>
+
       <div
         style={{
           textAlign: "center",
           fontWeight: 900,
           fontSize: "8px",
-          lineHeight: 1,
-          marginBottom: "0.4mm",
+          lineHeight: 0.95,
+          letterSpacing: "0.2px",
+          marginBottom: "0.7mm",
+          whiteSpace: "nowrap",
         }}
       >
-        <div>DISTRIBUCION G&amp;D S.A. DE C.V</div>
-        <div>CONTROL ACTIVO FIJO</div>
+        CONTROL ACTIVO FIJO
       </div>
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "8mm 1fr",
-          gap: "0.8mm",
-          alignItems: "center",
-          flex: 1,
-          minHeight: 0,
+          gridTemplateColumns: "12mm 1fr",
+          gap: "0.6mm",
+          alignItems: "end",
         }}
       >
         <div
           style={{
+            width: "12mm",
             display: "flex",
-            justifyContent: "center",
+            flexDirection: "column",
             alignItems: "center",
-            minWidth: 0,
-            minHeight: 0,
+            justifyContent: "flex-end",
           }}
         >
           <div
             style={{
-              width: "7mm",
-              height: "7mm",
+              width: "10.5mm",
+              height: "10.5mm",
               position: "relative",
             }}
           >
@@ -103,39 +129,58 @@ export default function BarcodePreview({ value }: Props) {
               priority
             />
           </div>
+
+          <div
+            style={{
+              fontSize: "6.5px",
+              fontWeight: 900,
+              lineHeight: 1,
+              marginTop: "0.1mm",
+              whiteSpace: "nowrap",
+            }}
+          >
+            FARMACIA
+          </div>
         </div>
 
         <div
           style={{
+            minWidth: 0,
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
-            minWidth: 0,
-            minHeight: 0,
+            justifyContent: "flex-end",
+            overflow: "hidden",
+            background: "#ffffff",
           }}
         >
-          <svg
-            ref={svgRef}
-            style={{
-              width: "100%",
-              height: "11mm",
-              display: "block",
-            }}
-          />
+          {barcodeUrl && (
+            <img
+              src={barcodeUrl}
+              alt="barcode"
+              style={{
+                width: "100%",
+                height: "8.8mm",
+                objectFit: "fill",
+                display: "block",
+                imageRendering: "pixelated",
+                background: "#ffffff",
+              }}
+            />
+          )}
 
           <div
             style={{
               textAlign: "center",
-              fontSize: "8px",
-              fontWeight: 900,
+              fontSize: "6.3px",
+              fontWeight: 700,
               lineHeight: 1,
-              marginTop: "0.4mm",
+              marginTop: "0.3mm",
               whiteSpace: "nowrap",
               overflow: "hidden",
-              textOverflow: "ellipsis",
+              textOverflow: "clip",
             }}
           >
-            {limpiarTexto(value || "SIN-CODIGO")}
+            {textoLimpio}
           </div>
         </div>
       </div>

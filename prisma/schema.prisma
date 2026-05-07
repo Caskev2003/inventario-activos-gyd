@@ -21,9 +21,20 @@ model usuario {
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
-  activosResponsable   activo_fijo[]       @relation("ResponsableActivo")
+  activosCreados       activo_fijo[]       @relation("ActivoCreadoPor")
   historialMovimientos historial_activos[] @relation("UsuarioHistorialActivo")
   reportesGenerados    reporte[]           @relation("UsuarioReporte")
+}
+
+model responsable_sucursal {
+  id                Int      @id @default(autoincrement())
+  sucursal          Sucursal @unique
+  nombreResponsable String   @db.VarChar(150)
+  cargo             String?  @db.VarChar(100)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([sucursal])
 }
 
 model activo_fijo {
@@ -35,15 +46,21 @@ model activo_fijo {
   medidas              String?             @db.VarChar(100)
   modeloMarca          String?             @map("modelo_marca") @db.VarChar(150)
   numeroSerie          String?             @unique @map("numero_serie") @db.VarChar(100)
-  condicionesActivo    String?             @map("condiciones_activo") @db.VarChar(150)
+
+  condicionIngreso     CondicionIngreso?   @map("condiciones_activo")
+
   observaciones        String?             @db.Text
   imagenActivo         String?             @map("imagen_activo") @db.VarChar(255)
 
   sucursal             Sucursal
   ubicacion            String?             @db.VarChar(150)
+  seccionExcel         String?             @map("seccion_excel") @db.VarChar(191)
 
-  responsableDirectoId Int?
-  responsableDirecto   usuario?            @relation("ResponsableActivo", fields: [responsableDirectoId], references: [id])
+  responsableNombre    String?             @db.VarChar(150)
+  responsableCargo     String?             @db.VarChar(100)
+
+  creadoPorId          Int?
+  creadoPor            usuario?            @relation("ActivoCreadoPor", fields: [creadoPorId], references: [id])
 
   status               EstadoActivo        @default(ACTIVO)
 
@@ -53,9 +70,12 @@ model activo_fijo {
   historialMovimientos historial_activos[] @relation("ActivoHistorial")
 
   @@index([numeroControl])
-  @@index([responsableDirectoId], map: "activo_fijo_responsableDirectoId_fkey")
+  @@index([creadoPorId])
   @@index([sucursal])
   @@index([tipoEquipo])
+  @@index([seccionExcel])
+  @@index([condicionIngreso])
+  @@index([responsableNombre])
 }
 
 model historial_activos {
@@ -120,6 +140,14 @@ enum EstadoActivo {
   INACTIVO
   MANTENIMIENTO
   BAJA
+}
+
+enum CondicionIngreso {
+  NUEVO
+  REACONDICIONADO
+  USADO
+  DONADO
+  TRANSFERIDO
 }
 
 enum TipoMovimiento {

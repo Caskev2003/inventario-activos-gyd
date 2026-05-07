@@ -113,10 +113,16 @@ export default async function Page({ searchParams }: PageProps) {
               >
                 Nuevo activo
               </Link>
+              <Link
+                href={`/gestion_activos/bajas?sucursal=${sucursal}`}
+                className="inline-flex h-10 items-center justify-center rounded-full bg-red-700 px-6 text-white hover:bg-red-600"
+              >
+                  Dados de baja
+              </Link>
             </>
           )}
 
-          <BotonRefrescar />
+          
         </div>
       </div>
 

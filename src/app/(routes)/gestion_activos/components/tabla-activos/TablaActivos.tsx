@@ -24,6 +24,10 @@ import { Trash2, FileSpreadsheet, Pencil, Search, Eye } from "lucide-react";
 import type { Activo } from "./TablaActivos.types";
 import { ModalEditarActivo } from "../modal-editar-activo";
 
+type ActivoConSeccion = Activo & {
+  seccionExcel?: string | null;
+};
+
 type Sucursal =
   | "TAPACHULA"
   | "CIUDAD_HIDALGO"
@@ -38,6 +42,8 @@ type TipoEquipoActivo =
   | "EQUIPO_OFICINA"
   | "EQUIPO_REPARTO"
   | "EQUIPO_TRANSPORTE";
+
+type EstadoActivo = "ACTIVO" | "INACTIVO" | "MANTENIMIENTO" | "BAJA";
 
 interface Props {
   refrescar?: number;
@@ -55,13 +61,6 @@ const SUCURSALES_VALIDAS: Sucursal[] = [
   "OFICINAS_ADMINISTRATIVAS",
   "ALMACEN_CIUDAD_HIDALGO",
   "ALMACEN_TUXTLA_GUTIERREZ",
-];
-
-const TIPOS_EQUIPO_VALIDOS: TipoEquipoActivo[] = [
-  "EQUIPO_MOBILIARIO",
-  "EQUIPO_OFICINA",
-  "EQUIPO_REPARTO",
-  "EQUIPO_TRANSPORTE",
 ];
 
 function obtenerOrdenTipoEquipo(tipo?: TipoEquipoActivo | string | null) {
@@ -109,10 +108,6 @@ function esSucursalValida(valor: string): valor is Sucursal {
   return SUCURSALES_VALIDAS.includes(valor as Sucursal);
 }
 
-function esTipoEquipoValido(valor: string): valor is TipoEquipoActivo {
-  return TIPOS_EQUIPO_VALIDOS.includes(valor as TipoEquipoActivo);
-}
-
 function formatearSucursal(sucursal?: string | null) {
   if (!sucursal) return "-";
   return sucursal.replaceAll("_", " ");
@@ -133,6 +128,23 @@ function formatearTipoEquipo(tipo?: string | null) {
   }
 }
 
+function formatearCondicionIngreso(condicion?: string | null) {
+  switch (condicion) {
+    case "NUEVO":
+      return "Nuevo";
+    case "REACONDICIONADO":
+      return "Reacondicionado";
+    case "USADO":
+      return "Usado";
+    case "DONADO":
+      return "Donado";
+    case "TRANSFERIDO":
+      return "Transferido";
+    default:
+      return "-";
+  }
+}
+
 export function TablaActivos({
   refrescar = 0,
   busqueda = "",
@@ -140,29 +152,54 @@ export function TablaActivos({
   creadoPorId,
   soloLectura = false,
 }: Props) {
-  const [activos, setActivos] = useState<Activo[]>([]);
-  const [activoSeleccionado, setActivoSeleccionado] = useState<Activo | null>(null);
-  const [activoEditar, setActivoEditar] = useState<Activo | null>(null);
+  const [activos, setActivos] = useState<ActivoConSeccion[]>([]);
+  const [activoSeleccionado, setActivoSeleccionado] =
+    useState<ActivoConSeccion | null>(null);
+  const [activoEditar, setActivoEditar] = useState<ActivoConSeccion | null>(
+    null
+  );
   const [openEditar, setOpenEditar] = useState(false);
   const [openImagen, setOpenImagen] = useState(false);
-  const [activoVerImagen, setActivoVerImagen] = useState<Activo | null>(null);
+  const [activoVerImagen, setActivoVerImagen] =
+    useState<ActivoConSeccion | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busquedaLocal, setBusquedaLocal] = useState("");
-  const [tipoEquipoFiltro, setTipoEquipoFiltro] = useState<"" | TipoEquipoActivo>("");
+  const [tipoEquipoFiltro, setTipoEquipoFiltro] =
+    useState<"" | TipoEquipoActivo>("");
+  const [seccionFiltro, setSeccionFiltro] = useState<string>("");
+  const [statusFiltro, setStatusFiltro] = useState<"" | EstadoActivo>("");
+  const [statusExport, setStatusExport] = useState<
+    "" | "ACTIVO" | "INACTIVO" | "MANTENIMIENTO" | "BAJA"
+  >("ACTIVO");
 
   const inputBusquedaRef = useRef<HTMLInputElement | null>(null);
 
   const itemsPerPage = 10;
+  const esOficinas = sucursalFiltro === "OFICINAS_ADMINISTRATIVAS";
 
-  const abrirModalEditar = (item: Activo) => {
+  const seccionesDisponibles = useMemo(() => {
+    if (!esOficinas) return [];
+
+    const unicos = new Set<string>();
+
+    activos.forEach((activo) => {
+      if (activo.seccionExcel && activo.seccionExcel.trim() !== "") {
+        unicos.add(activo.seccionExcel);
+      }
+    });
+
+    return Array.from(unicos).sort((a, b) => a.localeCompare(b));
+  }, [activos, esOficinas]);
+
+  const abrirModalEditar = (item: ActivoConSeccion) => {
     if (soloLectura) return;
     setActivoEditar(item);
     setOpenEditar(true);
   };
 
-  const abrirModalImagen = (item: Activo) => {
+  const abrirModalImagen = (item: ActivoConSeccion) => {
     setActivoVerImagen(item);
     setOpenImagen(true);
   };
@@ -207,13 +244,17 @@ export function TablaActivos({
       return `${prefijo} ${tipo} ${agruparNumerosDeTres(numeros)}`;
     }
 
-    const matchConEspacios = limpio.match(/^([A-Z]{3})\s+([A-Z0-9]+)\s+(\d{6,})$/);
+    const matchConEspacios = limpio.match(
+      /^([A-Z]{3})\s+([A-Z0-9]+)\s+(\d{6,})$/
+    );
     if (matchConEspacios) {
       const [, prefijo, tipo, numeros] = matchConEspacios;
       return `${prefijo} ${tipo} ${agruparNumerosDeTres(numeros)}`;
     }
 
-    const matchSeparado = limpio.match(/^([A-Z]{3})\s+([A-Z0-9]+)\s+((?:\d{3}\s*){2,4})$/);
+    const matchSeparado = limpio.match(
+      /^([A-Z]{3})\s+([A-Z0-9]+)\s+((?:\d{3}\s*){2,4})$/
+    );
     if (matchSeparado) {
       const [, prefijo, tipo, numeros] = matchSeparado;
       const soloNumeros = numeros.replace(/\s+/g, "");
@@ -276,17 +317,17 @@ export function TablaActivos({
       await axios.delete(`/api/activos?${params.toString()}`);
 
       toast({
-        title: "Activo eliminado",
-        description: `El activo "${descripcion}" fue eliminado correctamente.`,
+        title: "Activo dado de baja",
+        description: `El activo "${descripcion}" fue dado de baja correctamente.`,
       });
 
       setActivoSeleccionado(null);
       fetchActivos();
     } catch (error) {
-      console.error("Error al eliminar:", error);
+      console.error("Error al dar de baja:", error);
       toast({
-        title: "Error al eliminar",
-        description: "No se pudo eliminar el activo.",
+        title: "Error al dar de baja",
+        description: "No se pudo dar de baja el activo.",
         variant: "destructive",
       });
     }
@@ -304,7 +345,19 @@ export function TablaActivos({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [busqueda, busquedaLocal, sucursalFiltro, tipoEquipoFiltro]);
+  }, [
+    busqueda,
+    busquedaLocal,
+    sucursalFiltro,
+    tipoEquipoFiltro,
+    seccionFiltro,
+    statusFiltro,
+  ]);
+
+  useEffect(() => {
+    setTipoEquipoFiltro("");
+    setSeccionFiltro("");
+  }, [sucursalFiltro]);
 
   useEffect(() => {
     inputBusquedaRef.current?.focus();
@@ -337,8 +390,18 @@ export function TablaActivos({
       return compararNumeroControl(a.numeroControl, b.numeroControl);
     });
 
-    if (tipoEquipoFiltro) {
-      datos = datos.filter((item) => item.tipoEquipo === tipoEquipoFiltro);
+    if (esOficinas) {
+      if (seccionFiltro) {
+        datos = datos.filter((item) => item.seccionExcel === seccionFiltro);
+      }
+    } else {
+      if (tipoEquipoFiltro) {
+        datos = datos.filter((item) => item.tipoEquipo === tipoEquipoFiltro);
+      }
+    }
+
+    if (statusFiltro) {
+      datos = datos.filter((item) => item.status === statusFiltro);
     }
 
     if (textoBusqueda !== "") {
@@ -353,14 +416,26 @@ export function TablaActivos({
       datos = datos.filter((item) => {
         return (
           normalizarBusqueda(item.numeroControl).includes(textoBusqueda) ||
-          normalizarBusqueda(item.descripcionActivo ?? "").includes(textoBusqueda) ||
-          normalizarBusqueda(formatearTipoEquipo(item.tipoEquipo)).includes(textoBusqueda) ||
+          normalizarBusqueda(item.descripcionActivo ?? "").includes(
+            textoBusqueda
+          ) ||
+          normalizarBusqueda(formatearTipoEquipo(item.tipoEquipo)).includes(
+            textoBusqueda
+          ) ||
+          normalizarBusqueda(item.seccionExcel ?? "").includes(textoBusqueda) ||
           normalizarBusqueda(item.numeroSerie ?? "").includes(textoBusqueda) ||
           normalizarBusqueda(item.modeloMarca ?? "").includes(textoBusqueda) ||
           normalizarBusqueda(item.ubicacion ?? "").includes(textoBusqueda) ||
-          normalizarBusqueda(item.responsableDirecto?.nombre ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(item.responsableNombre ?? "").includes(
+            textoBusqueda
+          ) ||
+          normalizarBusqueda(item.creadoPor?.nombre ?? "").includes(
+            textoBusqueda
+          ) ||
           normalizarBusqueda(item.status ?? "").includes(textoBusqueda) ||
-          normalizarBusqueda(item.condicionesActivo ?? "").includes(textoBusqueda) ||
+          normalizarBusqueda(
+            formatearCondicionIngreso(item.condicionIngreso)
+          ).includes(textoBusqueda) ||
           normalizarBusqueda(item.observaciones ?? "").includes(textoBusqueda) ||
           normalizarBusqueda(item.sucursal ?? "").includes(textoBusqueda)
         );
@@ -368,7 +443,14 @@ export function TablaActivos({
     }
 
     return datos;
-  }, [activos, textoBusqueda, tipoEquipoFiltro]);
+  }, [
+    activos,
+    textoBusqueda,
+    tipoEquipoFiltro,
+    seccionFiltro,
+    statusFiltro,
+    esOficinas,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(datosAMostrar.length / itemsPerPage));
 
@@ -424,8 +506,35 @@ export function TablaActivos({
     );
   };
 
+  const BadgeCondicionIngreso = ({
+    condicion,
+  }: {
+    condicion?: string | null;
+  }) => {
+    const classes =
+      condicion === "NUEVO"
+        ? "bg-green-600 text-white"
+        : condicion === "REACONDICIONADO"
+        ? "bg-blue-600 text-white"
+        : condicion === "USADO"
+        ? "bg-yellow-400 text-gray-900"
+        : condicion === "DONADO"
+        ? "bg-purple-600 text-white"
+        : condicion === "TRANSFERIDO"
+        ? "bg-orange-500 text-white"
+        : "bg-gray-500 text-white";
+
+    return (
+      <span
+        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${classes}`}
+      >
+        {formatearCondicionIngreso(condicion)}
+      </span>
+    );
+  };
+
   const exportarExcel = async () => {
-    if (soloLectura || !datosAMostrar.length) return;
+    if (soloLectura) return;
 
     setExporting(true);
 
@@ -440,6 +549,7 @@ export function TablaActivos({
             sucursalFiltro && esSucursalValida(sucursalFiltro)
               ? sucursalFiltro
               : null,
+          status: statusExport || null,
           creadoPorId: creadoPorId ?? null,
         }),
       });
@@ -472,8 +582,7 @@ export function TablaActivos({
 
       toast({
         title: "Excel exportado",
-        description:
-          "El archivo se descargó y se guardó en el módulo de reportes.",
+        description: "El archivo se descargó y se guardó en el módulo de reportes.",
       });
     } catch (error) {
       console.error(error);
@@ -502,27 +611,48 @@ export function TablaActivos({
           </h3>
 
           {!soloLectura && (
-            <button
-              onClick={exportarExcel}
-              disabled={exporting || !datosAMostrar.length}
-              className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-md transition ${
-                exporting || !datosAMostrar.length
-                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                  : "bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 text-white hover:brightness-110 active:scale-[0.98]"
-              }`}
-              title={
-                !datosAMostrar.length ? "No hay datos para exportar" : "Exportar a Excel"
-              }
-            >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/20 backdrop-blur-sm">
-                <FileSpreadsheet className="h-4 w-4" />
-              </span>
-              {exporting ? "Exportando..." : "Exportar Excel"}
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                value={statusExport}
+                onChange={(e) =>
+                  setStatusExport(
+                    e.target.value as
+                      | ""
+                      | "ACTIVO"
+                      | "INACTIVO"
+                      | "MANTENIMIENTO"
+                      | "BAJA"
+                  )
+                }
+                className="rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+              >
+                <option value="ACTIVO">Activos</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+                <option value="INACTIVO">Inactivos</option>
+                <option value="BAJA">Dados de baja</option>
+                <option value="">Todos</option>
+              </select>
+
+              <button
+                onClick={exportarExcel}
+                disabled={exporting}
+                className={`group inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-md transition ${
+                  exporting
+                    ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                    : "bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-700 text-white hover:brightness-110 active:scale-[0.98]"
+                }`}
+                title="Exportar activos a Excel"
+              >
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/20 backdrop-blur-sm">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </span>
+                {exporting ? "Exportando..." : "Exportar"}
+              </button>
+            </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-center">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-start">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
@@ -530,7 +660,9 @@ export function TablaActivos({
               type="text"
               placeholder="Escanea o busca por control, descripción, tipo, serie, modelo, ubicación..."
               value={busquedaLocal}
-              onChange={(e) => setBusquedaLocal(formatearCodigoEscaneado(e.target.value))}
+              onChange={(e) =>
+                setBusquedaLocal(formatearCodigoEscaneado(e.target.value))
+              }
               onKeyDown={manejarEnterBusqueda}
               autoComplete="off"
               autoCapitalize="off"
@@ -538,6 +670,7 @@ export function TablaActivos({
               spellCheck={false}
               className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
             />
+
             {busquedaLocal && (
               <button
                 type="button"
@@ -556,18 +689,49 @@ export function TablaActivos({
           </div>
 
           <div className="w-full max-w-sm">
+            {esOficinas ? (
+              <select
+                value={seccionFiltro}
+                onChange={(e) => setSeccionFiltro(e.target.value)}
+                className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 px-3 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+              >
+                <option value="">Todas las secciones</option>
+
+                {seccionesDisponibles.map((sec) => (
+                  <option key={sec} value={sec}>
+                    {sec}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={tipoEquipoFiltro}
+                onChange={(e) =>
+                  setTipoEquipoFiltro(e.target.value as "" | TipoEquipoActivo)
+                }
+                className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 px-3 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+              >
+                <option value="">Todos los tipos de equipo</option>
+                <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
+                <option value="EQUIPO_OFICINA">Equipo de oficina</option>
+                <option value="EQUIPO_REPARTO">Equipo de reparto</option>
+                <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
+              </select>
+            )}
+          </div>
+
+          <div className="w-full max-w-sm">
             <select
-              value={tipoEquipoFiltro}
+              value={statusFiltro}
               onChange={(e) =>
-                setTipoEquipoFiltro(e.target.value as "" | TipoEquipoActivo)
+                setStatusFiltro(e.target.value as "" | EstadoActivo)
               }
               className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 px-3 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
             >
-              <option value="">Todos los tipos de equipo</option>
-              <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
-              <option value="EQUIPO_OFICINA">Equipo de oficina</option>
-              <option value="EQUIPO_REPARTO">Equipo de reparto</option>
-              <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
+              <option value="">Todos los status</option>
+              <option value="ACTIVO">Activos</option>
+              <option value="MANTENIMIENTO">Mantenimiento</option>
+              <option value="INACTIVO">Inactivos</option>
             </select>
           </div>
         </div>
@@ -586,8 +750,8 @@ export function TablaActivos({
 
           <div className="flex items-center gap-2">
             <div className="text-sm font-medium text-blue-300">
-              Página <span className="font-bold text-blue-100">{currentPage}</span> de{" "}
-              <span className="font-bold">{totalPages}</span>
+              Página <span className="font-bold text-blue-100">{currentPage}</span>{" "}
+              de <span className="font-bold">{totalPages}</span>
             </div>
 
             <button
@@ -645,16 +809,17 @@ export function TablaActivos({
             <tr>
               <th className="p-3 text-left">N° Control</th>
               <th className="p-3 text-left">Descripción</th>
-              <th className="p-3 text-left">Tipo de equipo</th>
+              <th className="p-3 text-left">{esOficinas ? "Sección" : "Tipo de equipo"}</th>
               <th className="p-3 text-left">Existencia</th>
               <th className="p-3 text-left">Medidas</th>
               <th className="p-3 text-left">Modelo/Marca</th>
               <th className="p-3 text-left">Serie</th>
-              <th className="p-3 text-left">Condiciones</th>
+              <th className="p-3 text-left">Condición</th>
               <th className="p-3 text-left">Observaciones</th>
               <th className="p-3 text-left">Sucursal</th>
               <th className="p-3 text-left">Ubicación</th>
               <th className="p-3 text-left">Responsable</th>
+              <th className="p-3 text-left">Dado de alta por</th>
               <th className="p-3 text-left">Status</th>
               <th className="p-3 text-left">Creado</th>
               <th className="p-3 text-center">Acciones</th>
@@ -665,7 +830,7 @@ export function TablaActivos({
             {loading && (
               <tr>
                 <td
-                  colSpan={15}
+                  colSpan={16}
                   className="text-center py-4 text-white bg-[#424242] font-semibold"
                 >
                   Cargando activos...
@@ -676,7 +841,7 @@ export function TablaActivos({
             {!loading && currentItems.length === 0 && (
               <tr>
                 <td
-                  colSpan={15}
+                  colSpan={16}
                   className="text-center py-4 text-red-500 bg-[#424242] font-semibold"
                 >
                   No hay activos registrados.
@@ -692,19 +857,22 @@ export function TablaActivos({
                 >
                   <td className="p-2">{item.numeroControl}</td>
                   <td className="p-2">{item.descripcionActivo}</td>
-                  <td className="p-2">{formatearTipoEquipo(item.tipoEquipo)}</td>
+                  <td className="p-2">{esOficinas ? item.seccionExcel || "-" : formatearTipoEquipo(item.tipoEquipo)}</td>
                   <td className="p-2">{item.existencia}</td>
                   <td className="p-2">{item.medidas || "-"}</td>
                   <td className="p-2">{item.modeloMarca || "-"}</td>
                   <td className="p-2">{item.numeroSerie || "-"}</td>
-                  <td className="p-2">{item.condicionesActivo || "-"}</td>
+                  <td className="p-2">
+                    <BadgeCondicionIngreso condicion={item.condicionIngreso} />
+                  </td>
                   <td className="p-2">{item.observaciones || "-"}</td>
                   <td className="p-2">{formatearSucursal(item.sucursal)}</td>
                   <td className="p-2">{item.ubicacion || "-"}</td>
                   <td className="p-2">
-                    {item.responsableDirecto?.nombre ||
-                      `ID ${item.responsableDirectoId ?? "-"}`}
+                    {item.responsableNombre || "-"}
+                    {item.responsableCargo ? ` (${item.responsableCargo})` : ""}
                   </td>
+                  <td className="p-2">{item.creadoPor?.nombre || "-"}</td>
                   <td className="p-2">
                     <BadgeStatus status={item.status} />
                   </td>
@@ -741,7 +909,7 @@ export function TablaActivos({
                             <button
                               onClick={() => setActivoSeleccionado(item)}
                               className="bg-gradient-to-b from-[#c62828] to-[#9d4245] text-white px-3 py-1 rounded-[5px] hover:bg-red-700 transition"
-                              title="Eliminar activo"
+                              title="Dar de baja activo"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -751,9 +919,12 @@ export function TablaActivos({
                             <AlertDialogHeader>
                               <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Estás a punto de eliminar el activo{" "}
-                                <strong>{activoSeleccionado?.descripcionActivo}</strong>.
-                                Esta acción no se puede revertir.
+                                Estás a punto de dar de baja el activo{" "}
+                                <strong>
+                                  {activoSeleccionado?.descripcionActivo}
+                                </strong>
+                                . No se borrará de la base de datos, solo dejará de
+                                aparecer en la tabla principal.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
 
@@ -776,7 +947,7 @@ export function TablaActivos({
                                 }}
                                 className="bg-red-500 hover:bg-red-700"
                               >
-                                Sí, eliminar
+                                Sí, dar de baja
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -803,14 +974,17 @@ export function TablaActivos({
         <DialogContent className="max-w-3xl bg-[#2f2f2f] text-white border border-gray-700">
           <DialogHeader>
             <DialogTitle>
-              Imagen del activo: {activoVerImagen?.descripcionActivo || "Sin descripción"}
+              Imagen del activo:{" "}
+              {activoVerImagen?.descripcionActivo || "Sin descripción"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="flex items-center justify-center">
             {activoVerImagen?.imagenActivo ? (
               <img
-                src={`/api/activos/imagen/${encodeURIComponent(activoVerImagen.imagenActivo)}`}
+                src={`/api/activos/imagen/${encodeURIComponent(
+                  activoVerImagen.imagenActivo
+                )}`}
                 alt={activoVerImagen.descripcionActivo}
                 className="max-h-[70vh] w-auto rounded-lg border border-gray-600 object-contain"
               />
