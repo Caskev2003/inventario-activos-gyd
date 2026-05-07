@@ -6,6 +6,7 @@ import { auth } from "../../../../../auth";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const pageSize = Math.min(
       Math.max(parseInt(searchParams.get("pageSize") || "10", 10), 1),
@@ -58,11 +59,12 @@ export async function DELETE(req: NextRequest) {
     }
 
     const session = await auth();
-    const me = Number(session?.user?.id ?? 0);
 
     if (!session?.user) {
       return new NextResponse("No autorizado", { status: 401 });
     }
+
+    const me = Number(session.user.id ?? 0);
 
     if (me === id) {
       return NextResponse.json(
@@ -71,7 +73,6 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Validar existencia del usuario a eliminar
     const victim = await db.usuario.findUnique({
       where: { id },
     });
@@ -80,25 +81,33 @@ export async function DELETE(req: NextRequest) {
       return new NextResponse("Usuario no existe", { status: 404 });
     }
 
-    // Contar referencias reales en el sistema actual
+    /*
+      En tu schema NO existe responsableDirectoId ni responsableId.
+      El activo guarda responsable por texto:
+      - responsableNombre
+      - responsableCargo
+    */
     const [historialCount, activosCount] = await Promise.all([
       db.historial_activos.count({
         where: { usuarioId: id },
       }),
       db.activo_fijo.count({
-        where: { responsableDirectoId: id },
+        where: {
+          responsableNombre: victim.nombre,
+        },
       }),
     ]);
 
     const totalRefs = historialCount + activosCount;
 
-    // Si no tiene referencias -> borrar directo
     if (totalRefs === 0) {
-      await db.usuario.delete({ where: { id } });
+      await db.usuario.delete({
+        where: { id },
+      });
+
       return new NextResponse(null, { status: 204 });
     }
 
-    // Si tiene referencias -> requerir toId
     const toId = Number(url.searchParams.get("toId"));
 
     if (!toId || toId === id || isNaN(toId)) {
@@ -115,7 +124,6 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Validar usuario destino
     const target = await db.usuario.findUnique({
       where: { id: toId },
     });
@@ -124,7 +132,6 @@ export async function DELETE(req: NextRequest) {
       return new NextResponse("Usuario destino no existe", { status: 404 });
     }
 
-    // Reasignar todo y borrar en transacción
     await db.$transaction([
       db.historial_activos.updateMany({
         where: { usuarioId: id },
@@ -133,10 +140,17 @@ export async function DELETE(req: NextRequest) {
           usuarioNombre: target.nombre,
         },
       }),
+
       db.activo_fijo.updateMany({
-        where: { responsableDirectoId: id },
-        data: { responsableDirectoId: toId },
+        where: {
+          responsableNombre: victim.nombre,
+        },
+        data: {
+          responsableNombre: target.nombre,
+          responsableCargo: target.rol,
+        },
       }),
+
       db.usuario.delete({
         where: { id },
       }),
