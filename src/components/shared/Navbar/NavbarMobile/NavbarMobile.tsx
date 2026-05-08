@@ -1,50 +1,103 @@
-"use client"
-import {
-    Sheet,
-    SheetContent,
-    SheetTrigger,
-  } from "@/components/ui/sheet"
+"use client";
 
-import { BellRing, Menu } from "lucide-react";
+import { cn } from "@/lib/utils";
+import React, { useState } from "react";
 import { itemsNavbar } from "@/data/itemsNavbar";
 import Link from "next/link";
-import { Logo } from "../../Logo";
-import { UserProfileCard } from "../../UserProfileCard"// ajusta la ruta si es necesario
+import Image from "next/image";
+import { useScrollPosition } from "@/hooks/useScrollPosition";
+import { UserProfileCard } from "@/components/shared/UserProfileCard";
+import { useSession } from "next-auth/react";
+import { Menu, X } from "lucide-react";
 
-export function NavbarMobile() {
+export function NavbarDesktop() {
+  const scrollPosition = useScrollPosition();
+  const { data: session, status } = useSession();
+  const [open, setOpen] = useState(false);
+
+  if (status === "loading") return null;
+
+  const rol = session?.user?.rol ?? "";
+
+  const itemsPermitidos = itemsNavbar.filter((item) =>
+    item.roles.includes(rol)
+  );
+
   return (
-    <div className='p-4 flex justify-between'>
-        <p>INELAC</p>
-        <Sheet>
-  <SheetTrigger>
-    <Menu/>
-  </SheetTrigger>
-  <SheetContent side= "left" className="bg-neutral-900">
-  {/*Mapeo de las opciones de navegación de PC a telefono */}
-   <div className="flex flex-col gap-4 ml-4 mt-4">
-    {itemsNavbar.map((item) => (
-      <Link key={item.name} href={item.link} 
-        className="hover:text-green-700 transition-all duration-300"> 
-          {item.name} 
-      </Link>
-    ))}
-   </div>
+    <header
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300",
+        scrollPosition > 20 ? "bg-black shadow-lg" : "bg-black md:bg-transparent"
+      )}
+    >
+      <div className="h-16 bg-black px-3 md:px-4 lg:px-6">
+        <div className="flex h-full items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              onClick={() => setOpen(false)}
+              className="flex h-14 w-[110px] items-center justify-center overflow-hidden"
+            >
+              <Image
+                src="/iconos/logo.jpeg"
+                alt="Distribución G&D"
+                width={110}
+                height={56}
+                className="h-full w-full object-contain"
+                priority
+              />
+            </Link>
 
-     {/*Creación de iconos search y notifications de la barra de navegación de PC a telefono */}
-   <div className="border-[1px] border-white/70 my-5"/>
-   <div className="flex justify-between gap-6 mt-4 ml-4">
-    <BellRing className="cursor-pointer  hover:text-green-700"/>
-    <div className="mx-5">
-    <UserProfileCard />
-    </div>
-   </div>
+            <nav className="hidden md:flex ml-4 gap-4 text-white">
+              {itemsPermitidos.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.link}
+                  className="transition-all duration-300 hover:text-green-500"
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </nav>
+          </div>
 
-   <div className="flex justify-center mt-35">
-   <Logo/>
-   </div>
+          <div className="hidden md:flex items-center">
+            {session?.user && <UserProfileCard />}
+          </div>
 
-  </SheetContent>
-</Sheet>
-    </div>
-  )
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className="flex md:hidden items-center justify-center rounded-lg p-2 text-white hover:bg-white/10 transition"
+            aria-label="Abrir menú"
+          >
+            {open ? <X size={26} /> : <Menu size={26} />}
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <div className="md:hidden bg-black border-t border-white/10 px-4 py-4 shadow-xl">
+          <nav className="flex flex-col gap-3 text-white">
+            {itemsPermitidos.map((item) => (
+              <Link
+                key={item.name}
+                href={item.link}
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-3 text-sm font-medium transition hover:bg-white/10 hover:text-green-500"
+              >
+                {item.name}
+              </Link>
+            ))}
+          </nav>
+
+          {session?.user && (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <UserProfileCard />
+            </div>
+          )}
+        </div>
+      )}
+    </header>
+  );
 }
