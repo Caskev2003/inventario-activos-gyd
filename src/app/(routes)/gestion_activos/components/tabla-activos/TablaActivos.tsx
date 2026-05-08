@@ -24,6 +24,7 @@ import { Trash2, FileSpreadsheet, Pencil, Search, Eye } from "lucide-react";
 import type { Activo } from "./TablaActivos.types";
 import { ModalEditarActivo } from "../modal-editar-activo";
 import { MobileBarcodeScanner } from "@/components/barcode/MobileBarcodeScanner";
+
 type ActivoConSeccion = Activo & {
   seccionExcel?: string | null;
 };
@@ -582,7 +583,8 @@ export function TablaActivos({
 
       toast({
         title: "Excel exportado",
-        description: "El archivo se descargó y se guardó en el módulo de reportes.",
+        description:
+          "El archivo se descargó y se guardó en el módulo de reportes.",
       });
     } catch (error) {
       console.error(error);
@@ -598,7 +600,7 @@ export function TablaActivos({
   };
 
   return (
-    <div className="overflow-x-auto mt-6">
+    <div className="mt-6 w-full overflow-hidden">
       <div className="mb-4 flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-lg font-bold text-white">
@@ -652,102 +654,102 @@ export function TablaActivos({
           )}
         </div>
 
-<div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(320px,520px)_minmax(220px,320px)_minmax(220px,320px)] lg:items-center">
-  <div className="flex w-full gap-2">
-    <div className="relative min-w-0 flex-1">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(360px,680px)_minmax(220px,320px)_minmax(220px,320px)] lg:items-center">
+          <div className="flex w-full gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
 
-      <input
-        ref={inputBusquedaRef}
-        type="text"
-        placeholder="Escanea o busca por control..."
-        value={busquedaLocal}
-        onChange={(e) =>
-          setBusquedaLocal(formatearCodigoEscaneado(e.target.value))
-        }
-        onKeyDown={manejarEnterBusqueda}
-        autoComplete="off"
-        autoCapitalize="off"
-        autoCorrect="off"
-        spellCheck={false}
-        className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-      />
+              <input
+                ref={inputBusquedaRef}
+                type="text"
+                placeholder="Escanea o busca por control..."
+                value={busquedaLocal}
+                onChange={(e) => setBusquedaLocal(e.target.value)}
+                onKeyDown={manejarEnterBusqueda}
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+              />
 
-      {busquedaLocal && (
-        <button
-          type="button"
-          onClick={() => {
-            setBusquedaLocal("");
-            setTimeout(() => {
-              inputBusquedaRef.current?.focus();
-            }, 50);
-          }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-300 hover:text-white"
-          title="Limpiar búsqueda"
-        >
-          ✕
-        </button>
-      )}
-    </div>
+              {busquedaLocal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBusquedaLocal("");
+                    setTimeout(() => {
+                      inputBusquedaRef.current?.focus();
+                    }, 50);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-300 hover:text-white"
+                  title="Limpiar búsqueda"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
-    <MobileBarcodeScanner
-      onScan={(codigo) => {
-        setBusquedaLocal(formatearCodigoEscaneado(codigo));
-        setCurrentPage(1);
-      }}
-    />
-  </div>
+            <MobileBarcodeScanner
+              onScan={(codigo) => {
+                setBusquedaLocal(formatearCodigoEscaneado(codigo));
+                setCurrentPage(1);
+              }}
+            />
+          </div>
 
-  <div className="w-full">
-    {esOficinas ? (
-      <select
-        value={seccionFiltro}
-        onChange={(e) => setSeccionFiltro(e.target.value)}
-        className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-      >
-        <option value="">Todas las secciones</option>
+          <div className="w-full">
+            {esOficinas ? (
+              <select
+                value={seccionFiltro}
+                onChange={(e) => setSeccionFiltro(e.target.value)}
+                className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+              >
+                <option value="">Todas las secciones</option>
 
-        {seccionesDisponibles.map((sec) => (
-          <option key={sec} value={sec}>
-            {sec}
-          </option>
-        ))}
-      </select>
-    ) : (
-      <select
-        value={tipoEquipoFiltro}
-        onChange={(e) =>
-          setTipoEquipoFiltro(e.target.value as "" | TipoEquipoActivo)
-        }
-        className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-      >
-        <option value="">Todos los tipos de equipo</option>
-        <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
-        <option value="EQUIPO_OFICINA">Equipo de oficina</option>
-        <option value="EQUIPO_REPARTO">Equipo de reparto</option>
-        <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
-      </select>
-    )}
-  </div>
+                {seccionesDisponibles.map((sec) => (
+                  <option key={sec} value={sec}>
+                    {sec}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={tipoEquipoFiltro}
+                onChange={(e) =>
+                  setTipoEquipoFiltro(e.target.value as "" | TipoEquipoActivo)
+                }
+                className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+              >
+                <option value="">Todos los tipos de equipo</option>
+                <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
+                <option value="EQUIPO_OFICINA">Equipo de oficina</option>
+                <option value="EQUIPO_REPARTO">Equipo de reparto</option>
+                <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
+              </select>
+            )}
+          </div>
 
-  <div className="w-full">
-    <select
-      value={statusFiltro}
-      onChange={(e) => setStatusFiltro(e.target.value as "" | EstadoActivo)}
-      className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-    >
-      <option value="">Todos los status</option>
-      <option value="ACTIVO">Activos</option>
-      <option value="MANTENIMIENTO">Mantenimiento</option>
-      <option value="INACTIVO">Inactivos</option>
-    </select>
-  </div>
-</div>
+          <div className="w-full">
+            <select
+              value={statusFiltro}
+              onChange={(e) =>
+                setStatusFiltro(e.target.value as "" | EstadoActivo)
+              }
+              className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+            >
+              <option value="">Todos los status</option>
+              <option value="ACTIVO">Activos</option>
+              <option value="MANTENIMIENTO">Mantenimiento</option>
+              <option value="INACTIVO">Inactivos</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-          <div className="text-sm font-medium text-blue-300">
+        <div className="mb-4 flex flex-col items-start justify-between gap-3 text-sm sm:flex-row sm:items-center">
+          <div className="font-medium text-blue-300">
             Mostrando registros{" "}
             <span className="font-bold text-blue-100">
               {datosAMostrar.length === 0 ? 0 : indexOfFirstItem + 1}
@@ -756,38 +758,42 @@ export function TablaActivos({
             de <span className="font-bold">{datosAMostrar.length}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-medium text-blue-300">
-              Página <span className="font-bold text-blue-100">{currentPage}</span>{" "}
-              de <span className="font-bold">{totalPages}</span>
+          <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
+            <div className="whitespace-nowrap font-medium text-blue-300">
+              Página{" "}
+              <span className="font-bold text-blue-100">{currentPage}</span> de{" "}
+              <span className="font-bold">{totalPages}</span>
             </div>
 
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className={`px-3 py-1 text-sm rounded-md font-medium transition-all ${
+              className={`whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all ${
                 currentPage === 1
-                  ? "text-gray-500 bg-gray-200 cursor-not-allowed"
-                  : "text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md"
+                  ? "cursor-not-allowed bg-gray-200 text-gray-500"
+                  : "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:from-blue-600 hover:to-blue-700"
               }`}
             >
               ANTERIOR
             </button>
 
-            <div className="flex gap-1 items-center">
+            <div className="flex items-center gap-1">
               {pageList.map((p, i) =>
                 p === "ellipsis" ? (
-                  <span key={`el-${i}`} className="px-2 text-blue-300 select-none">
+                  <span
+                    key={`el-${i}`}
+                    className="select-none px-2 text-blue-300"
+                  >
                     …
                   </span>
                 ) : (
                   <button
                     key={p}
                     onClick={() => goToPage(p)}
-                    className={`px-3 py-1 text-sm rounded-md font-medium transition-all ${
+                    className={`rounded-md px-3 py-1 text-sm font-medium transition-all ${
                       currentPage === p
-                        ? "text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-md transform scale-105"
-                        : "text-blue-700 bg-blue-100 hover:bg-blue-200"
+                        ? "scale-105 bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md"
+                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
                     }`}
                   >
                     {p}
@@ -799,10 +805,10 @@ export function TablaActivos({
             <button
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
-              className={`px-3 py-1 text-sm rounded-md font-medium transition-all ${
+              className={`whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all ${
                 currentPage === totalPages
-                  ? "text-gray-500 bg-gray-200 cursor-not-allowed"
-                  : "text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md"
+                  ? "cursor-not-allowed bg-gray-200 text-gray-500"
+                  : "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:from-blue-600 hover:to-blue-700"
               }`}
             >
               SIGUIENTE
@@ -813,163 +819,175 @@ export function TablaActivos({
 
       <div className="w-full overflow-x-auto rounded-lg shadow">
         <div className="max-h-[70vh] min-w-[1300px] overflow-y-auto">
-          <table className="w-full text-sm border-collapse bg-white">
-          <thead className="bg-[#1e3a5f] text-white sticky top-0 z-10">
-            <tr>
-              <th className="p-3 text-left">N° Control</th>
-              <th className="p-3 text-left">Descripción</th>
-              <th className="p-3 text-left">{esOficinas ? "Sección" : "Tipo de equipo"}</th>
-              <th className="p-3 text-left">Existencia</th>
-              <th className="p-3 text-left">Medidas</th>
-              <th className="p-3 text-left">Modelo/Marca</th>
-              <th className="p-3 text-left">Serie</th>
-              <th className="p-3 text-left">Condición</th>
-              <th className="p-3 text-left">Observaciones</th>
-              <th className="p-3 text-left">Sucursal</th>
-              <th className="p-3 text-left">Ubicación</th>
-              <th className="p-3 text-left">Responsable</th>
-              <th className="p-3 text-left">Dado de alta por</th>
-              <th className="p-3 text-left">Status</th>
-              <th className="p-3 text-left">Creado</th>
-              <th className="p-3 text-center">Acciones</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {loading && (
+          <table className="w-full border-collapse bg-white text-sm">
+            <thead className="sticky top-0 z-10 bg-[#1e3a5f] text-white">
               <tr>
-                <td
-                  colSpan={16}
-                  className="text-center py-4 text-white bg-[#424242] font-semibold"
-                >
-                  Cargando activos...
-                </td>
+                <th className="p-3 text-left">N° Control</th>
+                <th className="p-3 text-left">Descripción</th>
+                <th className="p-3 text-left">
+                  {esOficinas ? "Sección" : "Tipo de equipo"}
+                </th>
+                <th className="p-3 text-left">Existencia</th>
+                <th className="p-3 text-left">Medidas</th>
+                <th className="p-3 text-left">Modelo/Marca</th>
+                <th className="p-3 text-left">Serie</th>
+                <th className="p-3 text-left">Condición</th>
+                <th className="p-3 text-left">Observaciones</th>
+                <th className="p-3 text-left">Sucursal</th>
+                <th className="p-3 text-left">Ubicación</th>
+                <th className="p-3 text-left">Responsable</th>
+                <th className="p-3 text-left">Dado de alta por</th>
+                <th className="p-3 text-left">Status</th>
+                <th className="p-3 text-left">Creado</th>
+                <th className="p-3 text-center">Acciones</th>
               </tr>
-            )}
+            </thead>
 
-            {!loading && currentItems.length === 0 && (
-              <tr>
-                <td
-                  colSpan={16}
-                  className="text-center py-4 text-red-500 bg-[#424242] font-semibold"
-                >
-                  No hay activos registrados.
-                </td>
-              </tr>
-            )}
-
-            {!loading &&
-              currentItems.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b bg-[#424242] text-white hover:bg-gray-400 hover:text-black transition"
-                >
-                  <td className="p-2">{item.numeroControl}</td>
-                  <td className="p-2">{item.descripcionActivo}</td>
-                  <td className="p-2">{esOficinas ? item.seccionExcel || "-" : formatearTipoEquipo(item.tipoEquipo)}</td>
-                  <td className="p-2">{item.existencia}</td>
-                  <td className="p-2">{item.medidas || "-"}</td>
-                  <td className="p-2">{item.modeloMarca || "-"}</td>
-                  <td className="p-2">{item.numeroSerie || "-"}</td>
-                  <td className="p-2">
-                    <BadgeCondicionIngreso condicion={item.condicionIngreso} />
-                  </td>
-                  <td className="p-2">{item.observaciones || "-"}</td>
-                  <td className="p-2">{formatearSucursal(item.sucursal)}</td>
-                  <td className="p-2">{item.ubicacion || "-"}</td>
-                  <td className="p-2">
-                    {item.responsableNombre || "-"}
-                    {item.responsableCargo ? ` (${item.responsableCargo})` : ""}
-                  </td>
-                  <td className="p-2">{item.creadoPor?.nombre || "-"}</td>
-                  <td className="p-2">
-                    <BadgeStatus status={item.status} />
-                  </td>
-                  <td className="p-2">
-                    {item.createdAt
-                      ? new Date(item.createdAt).toLocaleDateString()
-                      : "-"}
-                  </td>
-                  <td className="p-2 text-center whitespace-nowrap">
-                    <button
-                      onClick={() => abrirModalImagen(item)}
-                      className="bg-gradient-to-b from-emerald-600 to-emerald-800 text-white px-3 py-1 rounded-[5px] hover:bg-emerald-700 transition mr-2"
-                      title="Ver imagen"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-
-                    {soloLectura ? (
-                      <span className="inline-block text-xs text-gray-300">
-                        Solo lectura
-                      </span>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => abrirModalEditar(item)}
-                          className="bg-gradient-to-b from-blue-600 to-blue-800 text-white px-3 py-1 rounded-[5px] hover:bg-blue-700 transition mr-2"
-                          title="Editar activo"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <button
-                              onClick={() => setActivoSeleccionado(item)}
-                              className="bg-gradient-to-b from-[#c62828] to-[#9d4245] text-white px-3 py-1 rounded-[5px] hover:bg-red-700 transition"
-                              title="Dar de baja activo"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </AlertDialogTrigger>
-
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Estás a punto de dar de baja el activo{" "}
-                                <strong>
-                                  {activoSeleccionado?.descripcionActivo}
-                                </strong>
-                                . No se borrará de la base de datos, solo dejará de
-                                aparecer en la tabla principal.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-
-                            <AlertDialogFooter>
-                              <AlertDialogCancel
-                                className="hover:bg-white hover:text-black transition-all"
-                                onClick={() => setActivoSeleccionado(null)}
-                              >
-                                Cancelar
-                              </AlertDialogCancel>
-
-                              <AlertDialogAction
-                                onClick={() => {
-                                  if (activoSeleccionado) {
-                                    eliminarActivo(
-                                      activoSeleccionado.id,
-                                      activoSeleccionado.descripcionActivo
-                                    );
-                                  }
-                                }}
-                                className="bg-red-500 hover:bg-red-700"
-                              >
-                                Sí, dar de baja
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </>
-                    )}
+            <tbody>
+              {loading && (
+                <tr>
+                  <td
+                    colSpan={16}
+                    className="bg-[#424242] py-4 text-center font-semibold text-white"
+                  >
+                    Cargando activos...
                   </td>
                 </tr>
-              ))}
-          </tbody>
-            </table>
-  </div>
-</div>
+              )}
+
+              {!loading && currentItems.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={16}
+                    className="bg-[#424242] py-4 text-center font-semibold text-red-500"
+                  >
+                    No hay activos registrados.
+                  </td>
+                </tr>
+              )}
+
+              {!loading &&
+                currentItems.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-b bg-[#424242] text-white transition hover:bg-gray-400 hover:text-black"
+                  >
+                    <td className="p-2">{item.numeroControl}</td>
+                    <td className="p-2">{item.descripcionActivo}</td>
+                    <td className="p-2">
+                      {esOficinas
+                        ? item.seccionExcel || "-"
+                        : formatearTipoEquipo(item.tipoEquipo)}
+                    </td>
+                    <td className="p-2">{item.existencia}</td>
+                    <td className="p-2">{item.medidas || "-"}</td>
+                    <td className="p-2">{item.modeloMarca || "-"}</td>
+                    <td className="p-2">{item.numeroSerie || "-"}</td>
+                    <td className="p-2">
+                      <BadgeCondicionIngreso
+                        condicion={item.condicionIngreso}
+                      />
+                    </td>
+                    <td className="p-2">{item.observaciones || "-"}</td>
+                    <td className="p-2">{formatearSucursal(item.sucursal)}</td>
+                    <td className="p-2">{item.ubicacion || "-"}</td>
+                    <td className="p-2">
+                      {item.responsableNombre || "-"}
+                      {item.responsableCargo
+                        ? ` (${item.responsableCargo})`
+                        : ""}
+                    </td>
+                    <td className="p-2">{item.creadoPor?.nombre || "-"}</td>
+                    <td className="p-2">
+                      <BadgeStatus status={item.status} />
+                    </td>
+                    <td className="p-2">
+                      {item.createdAt
+                        ? new Date(item.createdAt).toLocaleDateString()
+                        : "-"}
+                    </td>
+                    <td className="whitespace-nowrap p-2 text-center">
+                      <button
+                        onClick={() => abrirModalImagen(item)}
+                        className="mr-2 rounded-[5px] bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-1 text-white transition hover:bg-emerald-700"
+                        title="Ver imagen"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+
+                      {soloLectura ? (
+                        <span className="inline-block text-xs text-gray-300">
+                          Solo lectura
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => abrirModalEditar(item)}
+                            className="mr-2 rounded-[5px] bg-gradient-to-b from-blue-600 to-blue-800 px-3 py-1 text-white transition hover:bg-blue-700"
+                            title="Editar activo"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                onClick={() => setActivoSeleccionado(item)}
+                                className="rounded-[5px] bg-gradient-to-b from-[#c62828] to-[#9d4245] px-3 py-1 text-white transition hover:bg-red-700"
+                                title="Dar de baja activo"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </AlertDialogTrigger>
+
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  ¿Estás seguro?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Estás a punto de dar de baja el activo{" "}
+                                  <strong>
+                                    {activoSeleccionado?.descripcionActivo}
+                                  </strong>
+                                  . No se borrará de la base de datos, solo
+                                  dejará de aparecer en la tabla principal.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+
+                              <AlertDialogFooter>
+                                <AlertDialogCancel
+                                  className="transition-all hover:bg-white hover:text-black"
+                                  onClick={() => setActivoSeleccionado(null)}
+                                >
+                                  Cancelar
+                                </AlertDialogCancel>
+
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    if (activoSeleccionado) {
+                                      eliminarActivo(
+                                        activoSeleccionado.id,
+                                        activoSeleccionado.descripcionActivo
+                                      );
+                                    }
+                                  }}
+                                  className="bg-red-500 hover:bg-red-700"
+                                >
+                                  Sí, dar de baja
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {!soloLectura && (
         <ModalEditarActivo
@@ -981,7 +999,7 @@ export function TablaActivos({
       )}
 
       <Dialog open={openImagen} onOpenChange={setOpenImagen}>
-        <DialogContent className="max-w-3xl bg-[#2f2f2f] text-white border border-gray-700">
+        <DialogContent className="max-w-3xl border border-gray-700 bg-[#2f2f2f] text-white">
           <DialogHeader>
             <DialogTitle>
               Imagen del activo:{" "}
