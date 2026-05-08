@@ -3,8 +3,19 @@ import Link from "next/link";
 
 export function Logo() {
   return (
-    <Link href="/" className="font-extrabold text-2xl text-[#00FFFF]">
-      <Image src="/iconos/inelac-logo.webp" alt="Logo inelac" title="inelac" width={220} height={220}/>
+    <Link
+      href="/"
+      className="flex items-center justify-center"
+    >
+      <Image
+        src="/iconos/logo.jpeg"
+        alt="Distribución G&D"
+        title="Distribución G&D"
+        width={180}
+        height={180}
+        className="object-contain"
+        priority
+      />
     </Link>
   );
 }

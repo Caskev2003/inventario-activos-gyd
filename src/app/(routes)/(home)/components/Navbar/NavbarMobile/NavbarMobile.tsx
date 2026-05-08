@@ -1,19 +1,20 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import React, { useState } from "react";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
+import { Menu } from "lucide-react";
 import { itemsNavbar } from "@/data/itemsNavbar";
 import Link from "next/link";
-import Image from "next/image";
-import { useScrollPosition } from "@/hooks/useScrollPosition";
-import { UserProfileCard } from "@/components/shared/UserProfileCard";
+import { Logo } from "@/components/shared/Logo";
 import { useSession } from "next-auth/react";
-import { Menu, X } from "lucide-react";
+import { UserProfileCard } from "@/components/shared/UserProfileCard";
 
-export function NavbarDesktop() {
-  const scrollPosition = useScrollPosition();
+export function NavbarMobile() {
   const { data: session, status } = useSession();
-  const [open, setOpen] = useState(false);
 
   if (status === "loading") return null;
 
@@ -24,80 +25,40 @@ export function NavbarDesktop() {
   );
 
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300",
-        scrollPosition > 20 ? "bg-black shadow-lg" : "bg-black md:bg-transparent"
-      )}
-    >
-      <div className="h-16 bg-black px-3 md:px-4 lg:px-6">
-        <div className="flex h-full items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="flex h-14 w-[110px] items-center justify-center overflow-hidden"
-            >
-              <Image
-                src="/iconos/logo.jpeg"
-                alt="Distribución G&D"
-                width={110}
-                height={56}
-                className="h-full w-full object-contain"
-                priority
-              />
-            </Link>
+    <div className="p-4 flex justify-between items-center bg-black text-white shadow-md fixed top-0 left-0 right-0 z-50 md:hidden">
+      <p className="text-lg font-bold">DISTRIBUCIÓN G&D</p>
 
-            <nav className="hidden md:flex ml-4 gap-4 text-white">
-              {itemsPermitidos.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.link}
-                  className="transition-all duration-300 hover:text-green-500"
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
-          </div>
-
-          <div className="hidden md:flex items-center">
-            {session?.user && <UserProfileCard />}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            className="flex md:hidden items-center justify-center rounded-lg p-2 text-white hover:bg-white/10 transition"
-            aria-label="Abrir menú"
-          >
-            {open ? <X size={26} /> : <Menu size={26} />}
+      <Sheet>
+        <SheetTrigger asChild>
+          <button type="button">
+            <Menu className="text-white cursor-pointer" size={26} />
           </button>
-        </div>
-      </div>
+        </SheetTrigger>
 
-      {open && (
-        <div className="md:hidden bg-black border-t border-white/10 px-4 py-4 shadow-xl">
-          <nav className="flex flex-col gap-3 text-white">
+        <SheetContent side="left" className="bg-neutral-900 text-white z-50">
+          <div className="flex flex-col gap-4 ml-4 mt-8">
             {itemsPermitidos.map((item) => (
               <Link
                 key={item.name}
                 href={item.link}
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-3 text-sm font-medium transition hover:bg-white/10 hover:text-green-500"
+                className="hover:text-green-500 transition-all duration-300 text-lg"
               >
                 {item.name}
               </Link>
             ))}
-          </nav>
+          </div>
 
           {session?.user && (
-            <div className="mt-4 border-t border-white/10 pt-4">
+            <div className="mt-8 px-4">
               <UserProfileCard />
             </div>
           )}
-        </div>
-      )}
-    </header>
+
+          <div className="flex justify-center mt-12">
+            <Logo />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
