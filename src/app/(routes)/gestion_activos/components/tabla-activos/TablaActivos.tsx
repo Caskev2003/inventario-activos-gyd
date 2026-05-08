@@ -652,49 +652,55 @@ export function TablaActivos({
           )}
         </div>
 
-        <div className="flex w-full max-w-xl gap-2">
-  <div className="relative w-full">
-    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-start">
 
-    <input
-      ref={inputBusquedaRef}
-      type="text"
-      placeholder="Escanea o busca por control, descripción, tipo, serie, modelo, ubicación..."
-      value={busquedaLocal}
-      onChange={(e) =>
-        setBusquedaLocal(formatearCodigoEscaneado(e.target.value))
-      }
-      onKeyDown={manejarEnterBusqueda}
-      autoComplete="off"
-      autoCapitalize="off"
-      autoCorrect="off"
-      spellCheck={false}
-      className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+  {/* BUSCADOR + ESCÁNER */}
+  <div className="flex w-full max-w-xl gap-2">
+    
+    <div className="relative flex-1">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+      <input
+        ref={inputBusquedaRef}
+        type="text"
+        placeholder="Escanea o busca por control, descripción, tipo, serie, modelo, ubicación..."
+        value={busquedaLocal}
+        onChange={(e) =>
+          setBusquedaLocal(formatearCodigoEscaneado(e.target.value))
+        }
+        onKeyDown={manejarEnterBusqueda}
+        autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+      />
+
+      {busquedaLocal && (
+        <button
+          type="button"
+          onClick={() => {
+            setBusquedaLocal("");
+
+            setTimeout(() => {
+              inputBusquedaRef.current?.focus();
+            }, 50);
+          }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-300 hover:text-white"
+          title="Limpiar búsqueda"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+
+    <MobileBarcodeScanner
+      onScan={(codigo) => {
+        setBusquedaLocal(formatearCodigoEscaneado(codigo));
+        setCurrentPage(1);
+      }}
     />
-
-    {busquedaLocal && (
-      <button
-        type="button"
-        onClick={() => {
-          setBusquedaLocal("");
-          setTimeout(() => {
-            inputBusquedaRef.current?.focus();
-          }, 50);
-        }}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-300 hover:text-white"
-        title="Limpiar búsqueda"
-      >
-        ✕
-      </button>
-    )}
   </div>
-
-  <MobileBarcodeScanner
-    onScan={(codigo) => {
-      setBusquedaLocal(formatearCodigoEscaneado(codigo));
-      setCurrentPage(1);
-    }}
-  />
 
 
           <div className="w-full max-w-sm">
