@@ -8,8 +8,8 @@ import {
 } from "@zxing/browser";
 
 import {
-  DecodeHintType,
   BarcodeFormat,
+  DecodeHintType,
 } from "@zxing/library";
 
 import { Camera, X } from "lucide-react";
@@ -21,28 +21,42 @@ interface Props {
 export function MobileBarcodeScanner({ onScan }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+
   const [open, setOpen] = useState(false);
-  const [mensaje, setMensaje] = useState("Apunta la cámara al código de barras.");
+  const [mensaje, setMensaje] = useState(
+    "Apunta la cámara al código de barras del activo."
+  );
+
+  const validarCodigoActivo = (codigo: string) => {
+    const limpio = codigo.trim();
+
+    if (!limpio) return false;
+
+    // Evita lecturas basura como 17981132
+    if (/^\d+$/.test(limpio)) return false;
+
+    // Evita códigos demasiado cortos
+    if (limpio.length < 8) return false;
+
+    // Acepta códigos con letras, espacios o guiones
+    return /[A-Z]/i.test(limpio) || limpio.includes("-") || limpio.includes(" ");
+  };
 
   useEffect(() => {
     if (!open || !videoRef.current) return;
 
     const hints = new Map();
 
+    // Solo CODE_128 para evitar lecturas falsas
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
     ]);
 
     hints.set(DecodeHintType.TRY_HARDER, true);
 
     const reader = new BrowserMultiFormatReader(hints, {
-      delayBetweenScanAttempts: 150,
-      delayBetweenScanSuccess: 500,
+      delayBetweenScanAttempts: 120,
+      delayBetweenScanSuccess: 600,
     });
 
     reader
@@ -50,21 +64,26 @@ export function MobileBarcodeScanner({ onScan }: Props) {
         {
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
         },
         videoRef.current,
         (result) => {
-          if (result) {
-            const codigo = result.getText();
+          if (!result) return;
 
-            if (codigo) {
-              onScan(codigo);
-              setOpen(false);
-              controlsRef.current?.stop();
-            }
+          const codigo = result.getText()?.trim();
+
+          if (!codigo) return;
+
+          if (!validarCodigoActivo(codigo)) {
+            setMensaje(`Lectura ignorada: ${codigo}`);
+            return;
           }
+
+          onScan(codigo);
+          setOpen(false);
+          controlsRef.current?.stop();
         }
       )
       .then((controls) => {
@@ -86,7 +105,7 @@ export function MobileBarcodeScanner({ onScan }: Props) {
       <button
         type="button"
         onClick={() => {
-          setMensaje("Apunta la cámara al código de barras.");
+          setMensaje("Apunta la cámara al código de barras del activo.");
           setOpen(true);
         }}
         className="flex h-[46px] w-[52px] shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md transition hover:bg-emerald-700 md:hidden"
@@ -107,24 +126,25 @@ export function MobileBarcodeScanner({ onScan }: Props) {
                 setOpen(false);
               }}
               className="rounded-full bg-white/10 p-2"
+              title="Cerrar escáner"
             >
               <X size={24} />
             </button>
           </div>
 
           <div className="px-4">
-            <div className="relative overflow-hidden rounded-xl border border-white/20">
+            <div className="relative overflow-hidden rounded-xl border border-white/20 bg-black">
               <video
                 ref={videoRef}
-                className="h-[58vh] w-full object-cover"
+                className="h-[65vh] w-full bg-black object-contain"
                 muted
                 playsInline
                 autoPlay
               />
 
-              <div className="pointer-events-none absolute left-[8%] top-1/2 h-[120px] w-[84%] -translate-y-1/2 rounded-xl border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+              <div className="pointer-events-none absolute left-[6%] top-1/2 h-[130px] w-[88%] -translate-y-1/2 rounded-xl border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
 
-              <div className="pointer-events-none absolute left-[10%] top-1/2 h-[2px] w-[80%] -translate-y-1/2 bg-red-500" />
+              <div className="pointer-events-none absolute left-[8%] top-1/2 h-[2px] w-[84%] -translate-y-1/2 bg-red-500" />
             </div>
 
             <p className="mt-4 text-center text-sm text-white/80">
@@ -132,7 +152,7 @@ export function MobileBarcodeScanner({ onScan }: Props) {
             </p>
 
             <p className="mt-2 text-center text-xs text-white/50">
-              Acerca la cámara, mantén el código horizontal y con buena luz.
+              Coloca el código dentro del recuadro verde, horizontal y con buena luz.
             </p>
           </div>
         </div>
