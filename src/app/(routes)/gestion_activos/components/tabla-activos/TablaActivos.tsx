@@ -652,18 +652,15 @@ export function TablaActivos({
           )}
         </div>
 
-<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-start">
-
-  {/* BUSCADOR + ESCÁNER */}
-  <div className="flex w-full max-w-xl gap-2">
-    
-    <div className="relative flex-1">
+<div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(320px,520px)_minmax(220px,320px)_minmax(220px,320px)] lg:items-center">
+  <div className="flex w-full gap-2">
+    <div className="relative min-w-0 flex-1">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
 
       <input
         ref={inputBusquedaRef}
         type="text"
-        placeholder="Escanea o busca por control, descripción, tipo, serie, modelo, ubicación..."
+        placeholder="Escanea o busca por control..."
         value={busquedaLocal}
         onChange={(e) =>
           setBusquedaLocal(formatearCodigoEscaneado(e.target.value))
@@ -673,7 +670,7 @@ export function TablaActivos({
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+        className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 pl-10 pr-10 text-white placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
       />
 
       {busquedaLocal && (
@@ -681,7 +678,6 @@ export function TablaActivos({
           type="button"
           onClick={() => {
             setBusquedaLocal("");
-
             setTimeout(() => {
               inputBusquedaRef.current?.focus();
             }, 50);
@@ -702,54 +698,51 @@ export function TablaActivos({
     />
   </div>
 
+  <div className="w-full">
+    {esOficinas ? (
+      <select
+        value={seccionFiltro}
+        onChange={(e) => setSeccionFiltro(e.target.value)}
+        className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+      >
+        <option value="">Todas las secciones</option>
 
-          <div className="w-full max-w-sm">
-            {esOficinas ? (
-              <select
-                value={seccionFiltro}
-                onChange={(e) => setSeccionFiltro(e.target.value)}
-                className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 px-3 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-              >
-                <option value="">Todas las secciones</option>
+        {seccionesDisponibles.map((sec) => (
+          <option key={sec} value={sec}>
+            {sec}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <select
+        value={tipoEquipoFiltro}
+        onChange={(e) =>
+          setTipoEquipoFiltro(e.target.value as "" | TipoEquipoActivo)
+        }
+        className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+      >
+        <option value="">Todos los tipos de equipo</option>
+        <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
+        <option value="EQUIPO_OFICINA">Equipo de oficina</option>
+        <option value="EQUIPO_REPARTO">Equipo de reparto</option>
+        <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
+      </select>
+    )}
+  </div>
 
-                {seccionesDisponibles.map((sec) => (
-                  <option key={sec} value={sec}>
-                    {sec}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <select
-                value={tipoEquipoFiltro}
-                onChange={(e) =>
-                  setTipoEquipoFiltro(e.target.value as "" | TipoEquipoActivo)
-                }
-                className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 px-3 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-              >
-                <option value="">Todos los tipos de equipo</option>
-                <option value="EQUIPO_MOBILIARIO">Equipo mobiliario</option>
-                <option value="EQUIPO_OFICINA">Equipo de oficina</option>
-                <option value="EQUIPO_REPARTO">Equipo de reparto</option>
-                <option value="EQUIPO_TRANSPORTE">Equipo de transporte</option>
-              </select>
-            )}
-          </div>
-
-          <div className="w-full max-w-sm">
-            <select
-              value={statusFiltro}
-              onChange={(e) =>
-                setStatusFiltro(e.target.value as "" | EstadoActivo)
-              }
-              className="w-full rounded-xl border border-gray-600 bg-[#2f2f2f] py-2 px-3 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-            >
-              <option value="">Todos los status</option>
-              <option value="ACTIVO">Activos</option>
-              <option value="MANTENIMIENTO">Mantenimiento</option>
-              <option value="INACTIVO">Inactivos</option>
-            </select>
-          </div>
-        </div>
+  <div className="w-full">
+    <select
+      value={statusFiltro}
+      onChange={(e) => setStatusFiltro(e.target.value as "" | EstadoActivo)}
+      className="h-[46px] w-full rounded-xl border border-gray-600 bg-[#2f2f2f] px-3 py-2 text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+    >
+      <option value="">Todos los status</option>
+      <option value="ACTIVO">Activos</option>
+      <option value="MANTENIMIENTO">Mantenimiento</option>
+      <option value="INACTIVO">Inactivos</option>
+    </select>
+  </div>
+</div>
       </div>
 
       {totalPages > 1 && (
@@ -818,8 +811,9 @@ export function TablaActivos({
         </div>
       )}
 
-      <div className="max-h-[calc(100vh-300px)] overflow-y-auto rounded-lg shadow">
-        <table className="min-w-full text-sm border-collapse bg-white">
+      <div className="w-full overflow-x-auto rounded-lg shadow">
+        <div className="max-h-[70vh] min-w-[1300px] overflow-y-auto">
+          <table className="w-full text-sm border-collapse bg-white">
           <thead className="bg-[#1e3a5f] text-white sticky top-0 z-10">
             <tr>
               <th className="p-3 text-left">N° Control</th>
@@ -973,8 +967,9 @@ export function TablaActivos({
                 </tr>
               ))}
           </tbody>
-        </table>
-      </div>
+            </table>
+  </div>
+</div>
 
       {!soloLectura && (
         <ModalEditarActivo

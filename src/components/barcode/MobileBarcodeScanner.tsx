@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  BrowserMultiFormatReader,
-  IScannerControls,
-} from "@zxing/browser";
+import { BrowserMultiFormatReader, IScannerControls } from "@zxing/browser";
 import { Camera, X } from "lucide-react";
 
-interface Props {
+interface MobileBarcodeScannerProps {
   onScan: (codigo: string) => void;
 }
 
-export function MobileBarcodeScanner({ onScan }: Props) {
+export function MobileBarcodeScanner({ onScan }: MobileBarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const [open, setOpen] = useState(false);
@@ -21,10 +18,8 @@ export function MobileBarcodeScanner({ onScan }: Props) {
 
     const reader = new BrowserMultiFormatReader();
 
-    reader.decodeFromVideoDevice(
-      undefined,
-      videoRef.current,
-      (result) => {
+    reader
+      .decodeFromVideoDevice(undefined, videoRef.current, (result) => {
         if (result) {
           const codigo = result.getText();
 
@@ -32,10 +27,13 @@ export function MobileBarcodeScanner({ onScan }: Props) {
           setOpen(false);
           controlsRef.current?.stop();
         }
-      }
-    ).then((controls) => {
-      controlsRef.current = controls;
-    });
+      })
+      .then((controls) => {
+        controlsRef.current = controls;
+      })
+      .catch((error) => {
+        console.error("Error al abrir cámara:", error);
+      });
 
     return () => {
       controlsRef.current?.stop();
@@ -48,16 +46,16 @@ export function MobileBarcodeScanner({ onScan }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="md:hidden flex items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-white shadow hover:bg-emerald-700"
-        title="Escanear código"
+        className="flex h-[46px] w-[52px] shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md transition hover:bg-emerald-700 md:hidden"
+        title="Escanear código con cámara"
       >
-        <Camera size={20} />
+        <Camera size={22} />
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[9999] bg-black">
+        <div className="fixed inset-0 z-[99999] bg-black">
           <div className="flex items-center justify-between p-4 text-white">
-            <h2 className="text-lg font-bold">Escanear código de barras</h2>
+            <h2 className="text-lg font-bold">Escanear código</h2>
 
             <button
               type="button"
