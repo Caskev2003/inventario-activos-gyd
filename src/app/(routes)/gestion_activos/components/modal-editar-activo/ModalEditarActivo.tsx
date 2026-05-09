@@ -60,6 +60,8 @@ export function ModalEditarActivo({
   const [loading, setLoading] = useState(false);
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [previewImagen, setPreviewImagen] = useState<string | null>(null);
+  const [eliminarImagen, setEliminarImagen] = useState(false);
+
   const [responsableSucursal, setResponsableSucursal] =
     useState<ResponsableSucursal | null>(null);
 
@@ -130,6 +132,7 @@ export function ModalEditarActivo({
 
       setArchivoImagen(null);
       setPreviewImagen(null);
+      setEliminarImagen(false);
     }
   }, [activo]);
 
@@ -165,7 +168,9 @@ export function ModalEditarActivo({
   }, [previewImagen]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
 
@@ -185,6 +190,7 @@ export function ModalEditarActivo({
     setArchivoImagen(file);
 
     if (file) {
+      setEliminarImagen(false);
       const previewUrl = URL.createObjectURL(file);
       setPreviewImagen(previewUrl);
     } else {
@@ -210,11 +216,29 @@ export function ModalEditarActivo({
     return data.fileName as string;
   };
 
+  const marcarEliminarImagen = () => {
+    setEliminarImagen(true);
+    setArchivoImagen(null);
+
+    if (previewImagen) {
+      URL.revokeObjectURL(previewImagen);
+      setPreviewImagen(null);
+    }
+  };
+
+  const cancelarEliminarImagen = () => {
+    setEliminarImagen(false);
+  };
+
   const handleSubmit = async () => {
     try {
       setLoading(true);
 
-      let imagenActivo = formData.imagenActivo || null;
+      let imagenActivo: string | null = formData.imagenActivo || null;
+
+      if (eliminarImagen) {
+        imagenActivo = null;
+      }
 
       if (archivoImagen) {
         imagenActivo = await subirImagen(archivoImagen);
@@ -448,6 +472,7 @@ export function ModalEditarActivo({
 
           <div className="md:col-span-2">
             <label className="mb-1 block text-sm">Imagen del activo</label>
+
             <Input
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp"
@@ -456,20 +481,46 @@ export function ModalEditarActivo({
               disabled={loading}
             />
 
+            {eliminarImagen && (
+              <div className="mt-3 rounded-md border border-red-500 bg-red-950/40 p-3 text-sm text-red-200">
+                La imagen actual será eliminada al guardar cambios.
+                <button
+                  type="button"
+                  onClick={cancelarEliminarImagen}
+                  className="ml-2 font-bold text-white underline"
+                  disabled={loading}
+                >
+                  Cancelar eliminación
+                </button>
+              </div>
+            )}
+
             <div className="mt-4 flex flex-col gap-6 md:flex-row">
               <div>
                 <p className="mb-2 text-sm text-gray-300">Imagen actual:</p>
-                {formData.imagenActivo ? (
-                  <img
-                    src={`/api/activos/imagen/${encodeURIComponent(
-                      formData.imagenActivo
-                    )}`}
-                    alt={formData.descripcionActivo}
-                    className="h-36 w-36 rounded-lg border border-gray-600 bg-white object-cover"
-                  />
+
+                {formData.imagenActivo && !eliminarImagen ? (
+                  <div className="flex flex-col gap-3">
+                    <img
+                      src={`/api/activos/imagen/${encodeURIComponent(
+                        formData.imagenActivo
+                      )}`}
+                      alt={formData.descripcionActivo}
+                      className="h-36 w-36 rounded-lg border border-gray-600 bg-white object-cover"
+                    />
+
+                    <Button
+                      type="button"
+                      onClick={marcarEliminarImagen}
+                      className="bg-red-600 text-white hover:bg-red-700"
+                      disabled={loading}
+                    >
+                      Eliminar imagen
+                    </Button>
+                  </div>
                 ) : (
-                  <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-sm text-gray-300">
-                    Sin imagen
+                  <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-center text-sm text-gray-300">
+                    {eliminarImagen ? "Imagen marcada para eliminar" : "Sin imagen"}
                   </div>
                 )}
               </div>
@@ -478,6 +529,7 @@ export function ModalEditarActivo({
                 <p className="mb-2 text-sm text-gray-300">
                   Nueva vista previa:
                 </p>
+
                 {previewImagen ? (
                   <img
                     src={previewImagen}
@@ -485,7 +537,7 @@ export function ModalEditarActivo({
                     className="h-36 w-36 rounded-lg border border-gray-600 bg-white object-cover"
                   />
                 ) : (
-                  <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-sm text-gray-300">
+                  <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-gray-500 text-center text-sm text-gray-300">
                     No has seleccionado una nueva imagen
                   </div>
                 )}
