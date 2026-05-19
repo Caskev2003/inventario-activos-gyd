@@ -185,24 +185,18 @@ export async function GET(request: NextRequest) {
       status?: EstadoActivo | { not: EstadoActivo };
     } = {};
 
-    if (sucursal) {
-      where.sucursal = sucursal;
-    }
+    if (sucursal) where.sucursal = sucursal;
 
     if (status) {
       where.status = status;
     } else {
-      where.status = {
-        not: "BAJA",
-      };
+      where.status = { not: "BAJA" };
     }
 
     const activos = await db.activo_fijo.findMany({
       where,
       include: includeActivo,
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(activos);
@@ -222,15 +216,20 @@ export async function POST(request: NextRequest) {
 
     const numeroControl = String(body.numeroControl ?? "").trim().toUpperCase();
     const descripcionActivo = String(body.descripcionActivo ?? "").trim();
-    const tipoEquipoBody = body.tipoEquipo ? String(body.tipoEquipo).trim() : null;
-    const existencia = Number(body.existencia);
+
+    const tipoEquipoBody = body.tipoEquipo
+      ? String(body.tipoEquipo).trim()
+      : "EQUIPO_MOBILIARIO";
+
+    const existencia = body.existencia ? Number(body.existencia) : 1;
+
     const medidas = body.medidas ? String(body.medidas).trim() : null;
     const modeloMarca = body.modeloMarca ? String(body.modeloMarca).trim() : null;
     const numeroSerie = body.numeroSerie ? String(body.numeroSerie).trim() : null;
 
     const condicionIngresoBody = body.condicionIngreso
       ? String(body.condicionIngreso).trim()
-      : null;
+      : "NUEVO";
 
     const observaciones = body.observaciones
       ? String(body.observaciones).trim()
@@ -241,9 +240,15 @@ export async function POST(request: NextRequest) {
       : null;
 
     const sucursalBody = body.sucursal ? String(body.sucursal).trim() : null;
+
     const ubicacion = body.ubicacion ? String(body.ubicacion).trim() : null;
-    const creadoPorId = body.creadoPorId ? Number(body.creadoPorId) : null;
-    const statusBody = body.status ? String(body.status).trim() : null;
+
+    const creadoPorId =
+      body.creadoPorId !== undefined && body.creadoPorId !== null
+        ? Number(body.creadoPorId)
+        : null;
+
+    const statusBody = body.status ? String(body.status).trim() : "ACTIVO";
 
     if (!numeroControl) {
       return NextResponse.json(
@@ -261,7 +266,7 @@ export async function POST(request: NextRequest) {
 
     if (!esTipoEquipoValido(tipoEquipoBody)) {
       return NextResponse.json(
-        { error: "El tipo de equipo es obligatorio y debe ser válido" },
+        { error: "El tipo de equipo no es válido" },
         { status: 400 }
       );
     }
@@ -275,7 +280,7 @@ export async function POST(request: NextRequest) {
 
     if (!esCondicionIngresoValida(condicionIngresoBody)) {
       return NextResponse.json(
-        { error: "La condición de ingreso es obligatoria y debe ser válida" },
+        { error: "La condición de ingreso no es válida" },
         { status: 400 }
       );
     }
@@ -289,12 +294,12 @@ export async function POST(request: NextRequest) {
 
     if (!esEstadoValido(statusBody)) {
       return NextResponse.json(
-        { error: "El status es obligatorio y debe ser válido" },
+        { error: "El status no es válido" },
         { status: 400 }
       );
     }
 
-    if (!creadoPorId || creadoPorId < 1) {
+    if (!creadoPorId || creadoPorId < 1 || isNaN(creadoPorId)) {
       return NextResponse.json(
         { error: "No se pudo identificar al usuario que dio de alta" },
         { status: 400 }
@@ -305,22 +310,6 @@ export async function POST(request: NextRequest) {
     const status: EstadoActivo = statusBody;
     const tipoEquipo: TipoEquipoActivo = tipoEquipoBody;
     const condicionIngreso: CondicionIngreso = condicionIngresoBody;
-
-    const responsableSucursal = await db.responsable_sucursal.findUnique({
-      where: {
-        sucursal,
-      },
-    });
-
-    if (!responsableSucursal) {
-      return NextResponse.json(
-        {
-          error:
-            "No hay responsable asignado para esta sucursal. Primero registra un responsable.",
-        },
-        { status: 400 }
-      );
-    }
 
     const usuarioCreoExiste = await db.usuario.findUnique({
       where: { id: creadoPorId },
@@ -334,6 +323,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "El usuario que dio de alta no existe" },
         { status: 404 }
+      );
+    }
+
+    const responsableSucursal = await db.responsable_sucursal.findUnique({
+      where: { sucursal },
+    });
+
+    if (!responsableSucursal) {
+      return NextResponse.json(
+        {
+          error:
+            "No hay responsable asignado para esta sucursal. Primero registra un responsable.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const numeroControlExiste = await db.activo_fijo.findFirst({
+      where: {
+        numeroControl,
+        sucursal,
+      },
+    });
+
+    if (numeroControlExiste) {
+      return NextResponse.json(
+        {
+          error:
+            "Ya existe un activo con ese número de control en esta sucursal",
+        },
+        { status: 400 }
       );
     }
 
@@ -365,7 +385,7 @@ export async function POST(request: NextRequest) {
         sucursal,
         ubicacion,
         responsableNombre: responsableSucursal.nombreResponsable,
-        responsableCargo: responsableSucursal.cargo,
+        responsableCargo: responsableSucursal.cargo ?? null,
         creadoPorId,
         status,
       },
@@ -377,7 +397,11 @@ export async function POST(request: NextRequest) {
       numeroControl: nuevoActivo.numeroControl,
       descripcion: nuevoActivo.descripcionActivo,
       tipoMovimiento: "ALTA",
-      detalle: `Se registró el activo [Tipo de equipo: ${nuevoActivo.tipoEquipo}] [Condición de ingreso: ${nuevoActivo.condicionIngreso}] [Responsable: ${
+      detalle: `Se registró el activo [Tipo de equipo: ${
+        nuevoActivo.tipoEquipo
+      }] [Condición de ingreso: ${
+        nuevoActivo.condicionIngreso ?? "Sin condición"
+      }] [Responsable: ${
         nuevoActivo.responsableNombre ?? "Sin responsable"
       }] con status ${nuevoActivo.status}${
         nuevoActivo.ubicacion ? ` en ubicación ${nuevoActivo.ubicacion}` : ""
@@ -394,11 +418,14 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al registrar activo:", error);
 
     return NextResponse.json(
-      { error: "Error interno al registrar el activo" },
+      {
+        error: "Error interno al registrar el activo",
+        detail: error?.message ?? String(error),
+      },
       { status: 500 }
     );
   }
@@ -411,15 +438,20 @@ export async function PUT(request: NextRequest) {
     const id = Number(body.id);
     const numeroControl = String(body.numeroControl ?? "").trim().toUpperCase();
     const descripcionActivo = String(body.descripcionActivo ?? "").trim();
-    const tipoEquipoBody = body.tipoEquipo ? String(body.tipoEquipo).trim() : null;
-    const existencia = Number(body.existencia);
+
+    const tipoEquipoBody = body.tipoEquipo
+      ? String(body.tipoEquipo).trim()
+      : "EQUIPO_MOBILIARIO";
+
+    const existencia = body.existencia ? Number(body.existencia) : 1;
+
     const medidas = body.medidas ? String(body.medidas).trim() : null;
     const modeloMarca = body.modeloMarca ? String(body.modeloMarca).trim() : null;
     const numeroSerie = body.numeroSerie ? String(body.numeroSerie).trim() : null;
 
     const condicionIngresoBody = body.condicionIngreso
       ? String(body.condicionIngreso).trim()
-      : null;
+      : "NUEVO";
 
     const observaciones = body.observaciones
       ? String(body.observaciones).trim()
@@ -432,11 +464,13 @@ export async function PUT(request: NextRequest) {
 
     const sucursalBody = body.sucursal ? String(body.sucursal).trim() : null;
     const ubicacion = body.ubicacion ? String(body.ubicacion).trim() : null;
+
     const creadoPorId =
       body.creadoPorId !== undefined && body.creadoPorId !== null
         ? Number(body.creadoPorId)
         : null;
-    const statusBody = body.status ? String(body.status).trim() : null;
+
+    const statusBody = body.status ? String(body.status).trim() : "ACTIVO";
 
     if (isNaN(id) || id < 1) {
       return NextResponse.json(
@@ -461,7 +495,7 @@ export async function PUT(request: NextRequest) {
 
     if (!esTipoEquipoValido(tipoEquipoBody)) {
       return NextResponse.json(
-        { error: "El tipo de equipo es obligatorio y debe ser válido" },
+        { error: "El tipo de equipo no es válido" },
         { status: 400 }
       );
     }
@@ -475,7 +509,7 @@ export async function PUT(request: NextRequest) {
 
     if (!esCondicionIngresoValida(condicionIngresoBody)) {
       return NextResponse.json(
-        { error: "La condición de ingreso es obligatoria y debe ser válida" },
+        { error: "La condición de ingreso no es válida" },
         { status: 400 }
       );
     }
@@ -489,7 +523,7 @@ export async function PUT(request: NextRequest) {
 
     if (!esEstadoValido(statusBody)) {
       return NextResponse.json(
-        { error: "El status es obligatorio y debe ser válido" },
+        { error: "El status no es válido" },
         { status: 400 }
       );
     }
@@ -530,6 +564,24 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const numeroControlDuplicado = await db.activo_fijo.findFirst({
+      where: {
+        numeroControl,
+        sucursal,
+        NOT: { id },
+      },
+    });
+
+    if (numeroControlDuplicado) {
+      return NextResponse.json(
+        {
+          error:
+            "Ya existe otro activo con ese número de control en esta sucursal",
+        },
+        { status: 400 }
+      );
+    }
+
     if (numeroSerie) {
       const numeroSerieDuplicado = await db.activo_fijo.findFirst({
         where: {
@@ -547,9 +599,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const responsableSucursal = await db.responsable_sucursal.findUnique({
-      where: {
-        sucursal,
-      },
+      where: { sucursal },
     });
 
     if (!responsableSucursal) {
@@ -559,88 +609,6 @@ export async function PUT(request: NextRequest) {
             "No hay responsable asignado para esta sucursal. Primero registra un responsable.",
         },
         { status: 400 }
-      );
-    }
-
-    const cambios: string[] = [];
-
-    if (activoExiste.numeroControl !== numeroControl) {
-      cambios.push(`Número de control: ${activoExiste.numeroControl} → ${numeroControl}`);
-    }
-
-    if (activoExiste.descripcionActivo !== descripcionActivo) {
-      cambios.push(`Descripción: ${activoExiste.descripcionActivo} → ${descripcionActivo}`);
-    }
-
-    if (activoExiste.tipoEquipo !== tipoEquipo) {
-      cambios.push(`Tipo de equipo: ${activoExiste.tipoEquipo} → ${tipoEquipo}`);
-    }
-
-    if (activoExiste.existencia !== existencia) {
-      cambios.push(`Existencia: ${activoExiste.existencia} → ${existencia}`);
-    }
-
-    if ((activoExiste.medidas ?? "") !== (medidas ?? "")) {
-      cambios.push(`Medidas: ${activoExiste.medidas ?? "Sin dato"} → ${medidas ?? "Sin dato"}`);
-    }
-
-    if ((activoExiste.modeloMarca ?? "") !== (modeloMarca ?? "")) {
-      cambios.push(
-        `Modelo/Marca: ${activoExiste.modeloMarca ?? "Sin dato"} → ${modeloMarca ?? "Sin dato"}`
-      );
-    }
-
-    if ((activoExiste.numeroSerie ?? "") !== (numeroSerie ?? "")) {
-      cambios.push(
-        `Número de serie: ${activoExiste.numeroSerie ?? "Sin dato"} → ${numeroSerie ?? "Sin dato"}`
-      );
-    }
-
-    if ((activoExiste.condicionIngreso ?? "") !== (condicionIngreso ?? "")) {
-      cambios.push(
-        `Condición de ingreso: ${activoExiste.condicionIngreso ?? "Sin dato"} → ${
-          condicionIngreso ?? "Sin dato"
-        }`
-      );
-    }
-
-    if ((activoExiste.observaciones ?? "") !== (observaciones ?? "")) {
-      cambios.push("Observaciones actualizadas");
-    }
-
-    if ((activoExiste.imagenActivo ?? "") !== (imagenActivo ?? "")) {
-      cambios.push("Imagen actualizada");
-    }
-
-    if (activoExiste.sucursal !== sucursal) {
-      cambios.push(`Sucursal: ${activoExiste.sucursal} → ${sucursal}`);
-    }
-
-    if ((activoExiste.ubicacion ?? "") !== (ubicacion ?? "")) {
-      cambios.push(
-        `Ubicación: ${activoExiste.ubicacion ?? "Sin ubicación"} → ${
-          ubicacion ?? "Sin ubicación"
-        }`
-      );
-    }
-
-    if ((activoExiste.responsableNombre ?? "") !== responsableSucursal.nombreResponsable) {
-      cambios.push(
-        `Responsable: ${activoExiste.responsableNombre ?? "Sin responsable"} → ${
-          responsableSucursal.nombreResponsable
-        }`
-      );
-    }
-
-    if (activoExiste.status !== status) {
-      cambios.push(`Status: ${activoExiste.status} → ${status}`);
-    }
-
-    if ((activoExiste.creadoPorId ?? 0) !== (creadoPorId ?? 0)) {
-      cambios.push(
-        `Dado de alta por: ${activoExiste.creadoPor?.nombre ?? "Sin dato"} → ${
-          creadoPorExiste?.nombre ?? "Sin dato"
-        }`
       );
     }
 
@@ -660,7 +628,7 @@ export async function PUT(request: NextRequest) {
         sucursal,
         ubicacion,
         responsableNombre: responsableSucursal.nombreResponsable,
-        responsableCargo: responsableSucursal.cargo,
+        responsableCargo: responsableSucursal.cargo ?? null,
         creadoPorId,
         status,
       },
@@ -672,10 +640,7 @@ export async function PUT(request: NextRequest) {
       numeroControl: activoActualizado.numeroControl,
       descripcion: activoActualizado.descripcionActivo,
       tipoMovimiento: "EDICION",
-      detalle:
-        cambios.length > 0
-          ? cambios.join(" | ")
-          : "Se editó el activo sin cambios detectables en los campos principales",
+      detalle: "Se editó el activo",
       sucursal: activoActualizado.sucursal as Sucursal,
       usuarioId: creadoPorId ?? null,
       usuarioNombre: creadoPorExiste?.nombre ?? null,
@@ -685,11 +650,14 @@ export async function PUT(request: NextRequest) {
       message: "Activo actualizado correctamente",
       activo: activoActualizado,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al actualizar activo:", error);
 
     return NextResponse.json(
-      { error: "Error interno al actualizar el activo" },
+      {
+        error: "Error interno al actualizar el activo",
+        detail: error?.message ?? String(error),
+      },
       { status: 500 }
     );
   }
@@ -751,11 +719,14 @@ export async function PATCH(request: NextRequest) {
       message: "Status actualizado correctamente",
       activo: activoActualizado,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al cambiar status:", error);
 
     return NextResponse.json(
-      { error: "Error al cambiar status del activo" },
+      {
+        error: "Error al cambiar status del activo",
+        detail: error?.message ?? String(error),
+      },
       { status: 500 }
     );
   }
@@ -831,7 +802,11 @@ export async function DELETE(request: NextRequest) {
       tipoMovimiento: "BAJA",
       detalle: `Se dio de baja el activo [Tipo de equipo: ${
         activoDadoDeBaja.tipoEquipo
-      }]${activoDadoDeBaja.ubicacion ? ` ubicado en ${activoDadoDeBaja.ubicacion}` : ""}`,
+      }]${
+        activoDadoDeBaja.ubicacion
+          ? ` ubicado en ${activoDadoDeBaja.ubicacion}`
+          : ""
+      }`,
       sucursal: activoDadoDeBaja.sucursal as Sucursal,
       usuarioId: activoDadoDeBaja.creadoPorId ?? null,
       usuarioNombre: activoDadoDeBaja.creadoPor?.nombre ?? null,
@@ -841,11 +816,14 @@ export async function DELETE(request: NextRequest) {
       message: "Activo dado de baja correctamente",
       activo: activoDadoDeBaja,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al dar de baja activo:", error);
 
     return NextResponse.json(
-      { error: "Error al dar de baja activo" },
+      {
+        error: "Error al dar de baja activo",
+        detail: error?.message ?? String(error),
+      },
       { status: 500 }
     );
   }

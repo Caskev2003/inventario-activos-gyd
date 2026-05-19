@@ -4,7 +4,7 @@ export const activoSchema = z.object({
   numeroControl: z
     .string()
     .min(1, "El número de control es obligatorio")
-    .max(50, "Máximo 50 caracteres"),
+    .max(100, "Máximo 100 caracteres"),
 
   descripcionActivo: z
     .string()
@@ -63,10 +63,6 @@ export const activoSchema = z.object({
     .max(150, "Máximo 150 caracteres")
     .optional()
     .or(z.literal("")),
-
-  responsableDirectoId: z.coerce
-    .number()
-    .min(1, "El responsable directo es obligatorio"),
 
   status: z.enum(["ACTIVO", "INACTIVO", "MANTENIMIENTO", "BAJA"]),
 });
