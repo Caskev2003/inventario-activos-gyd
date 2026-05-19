@@ -203,100 +203,98 @@ export function ActivosForm({ sucursal, creadoPorId, creadoPorNombre }: Props) {
     return data.fileName as string;
   };
 
-const imprimirEtiqueta = () => {
-  const contenido = document.getElementById("area-etiqueta");
+  const imprimirEtiqueta = () => {
+    const contenido = document.getElementById("area-etiqueta");
 
-  if (!contenido || !codigoBarras.trim()) return;
+    if (!contenido || !codigoBarras.trim()) return;
 
-  const ventana = window.open("", "_blank", "width=600,height=400");
+    const ventana = window.open("", "_blank", "width=600,height=400");
 
-  if (!ventana) return;
+    if (!ventana) return;
 
-  // CLON REAL DEL NODO
-  const contenidoHTML = contenido.outerHTML;
+    const contenidoHTML = contenido.outerHTML;
 
-  ventana.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Etiqueta</title>
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Etiqueta</title>
+          <style>
+            @page {
+              size: 50.8mm 25.4mm;
+              margin: 0;
+            }
 
-        <style>
-          @page {
-            size: 50.8mm 25.4mm;
-            margin: 0;
-          }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
 
-          * {
-            box-sizing: border-box;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
+            html,
+            body {
+              width: 50.8mm;
+              height: 25.4mm;
+              margin: 0;
+              padding: 0;
+              overflow: hidden;
+              background: #ffffff;
+            }
 
-          html,
-          body {
-            width: 50.8mm;
-            height: 25.4mm;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #ffffff;
-          }
+            body {
+              display: flex;
+              align-items: flex-start;
+              justify-content: flex-start;
+            }
 
-          body {
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
-          }
+            #area-etiqueta {
+              width: 50.8mm !important;
+              height: 25.4mm !important;
+              overflow: hidden !important;
+            }
 
-          #area-etiqueta {
-            width: 50.8mm !important;
-            height: 25.4mm !important;
-            overflow: hidden !important;
-          }
+            svg {
+              width: 100% !important;
+              overflow: visible !important;
+              shape-rendering: crispEdges !important;
+              text-rendering: geometricPrecision !important;
+            }
 
-          svg {
-            width: 100% !important;
-            overflow: visible !important;
-            shape-rendering: crispEdges !important;
-            text-rendering: geometricPrecision !important;
-          }
+            img {
+              image-rendering: pixelated !important;
+            }
+          </style>
+        </head>
 
-          img {
-            image-rendering: pixelated !important;
-          }
-        </style>
-      </head>
+        <body>
+          ${contenidoHTML}
 
-      <body>
-        ${contenidoHTML}
+          <script>
+            let yaImprimio = false;
 
-        <script>
-          let yaImprimio = false;
+            function imprimir() {
+              if (yaImprimio) return;
 
-          function imprimir() {
-            if (yaImprimio) return;
-
-            yaImprimio = true;
-
-            setTimeout(() => {
-              window.focus();
-              window.print();
+              yaImprimio = true;
 
               setTimeout(() => {
-                window.close();
-              }, 500);
-            }, 700);
-          }
+                window.focus();
+                window.print();
 
-          window.onload = imprimir;
-        </script>
-      </body>
-    </html>
-  `);
+                setTimeout(() => {
+                  window.close();
+                }, 500);
+              }, 700);
+            }
 
-  ventana.document.close();
-};
+            window.onload = imprimir;
+          </script>
+        </body>
+      </html>
+    `);
+
+    ventana.document.close();
+  };
 
   const onSubmit = async (values: ActivosFormValues) => {
     try {
@@ -320,9 +318,12 @@ const imprimirEtiqueta = () => {
 
       const payload = {
         ...values,
-        numeroControl: values.numeroControl.toUpperCase(),
+        numeroControl: values.numeroControl.toUpperCase().trim(),
+        descripcionActivo: values.descripcionActivo.trim(),
         sucursal: sucursalActual,
         creadoPorId: usuarioLogueadoId,
+        responsableNombre: responsableSucursal.nombreResponsable,
+        responsableCargo: responsableSucursal.cargo ?? null,
         imagenActivo,
       };
 
@@ -626,7 +627,9 @@ const imprimirEtiqueta = () => {
                 ? "Cargando responsable..."
                 : responsableSucursal
                 ? `${responsableSucursal.nombreResponsable}${
-                    responsableSucursal.cargo ? ` - ${responsableSucursal.cargo}` : ""
+                    responsableSucursal.cargo
+                      ? ` - ${responsableSucursal.cargo}`
+                      : ""
                   }`
                 : "Sin responsable asignado para esta sucursal"
             }
