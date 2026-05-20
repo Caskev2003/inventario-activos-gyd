@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { TablaActivos } from "./components/tabla-activos";
 import Link from "next/link";
 import ImportarExcelActivos from "./components/importar-excel/ImportarExcelActivos";
+import { RelojMexico } from "@/components/RelojMexico";
 import BotonRefrescar from "./components/boton-refrescar/BotonRefrescar";
 
 type Sucursal =
@@ -94,7 +95,10 @@ export default async function Page({ searchParams }: PageProps) {
             </p>
           </div>
         </div>
+      
 
+      <div className="flex flex-col items-end gap-3">
+        <RelojMexico />
         <div className="flex flex-col gap-3 sm:flex-row">
           {!soloLectura && (
             <>
@@ -122,7 +126,7 @@ export default async function Page({ searchParams }: PageProps) {
             </>
           )}
 
-          
+           </div>
         </div>
       </div>
 

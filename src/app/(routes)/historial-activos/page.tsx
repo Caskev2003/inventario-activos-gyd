@@ -1,6 +1,7 @@
 import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
 import { TablaHistorial } from "./components/tabla-historial";
+import { RelojMexico } from "@/components/RelojMexico";
 import Link from "next/link";
 
 interface PageProps {
@@ -27,20 +28,21 @@ export default async function Page({ searchParams }: PageProps) {
       
       {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
-        
-        <div className="flex items-center gap-3">
-          <Link
-            href="/gestion_almacen"
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-full text-sm"
-          >
-            ← Regresar
-          </Link>
+  <div className="flex items-center gap-3">
+    <Link
+      href="/gestion_almacen"
+      className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-full text-sm"
+    >
+      ← Regresar
+    </Link>
 
-          <h1 className="text-3xl font-bold text-white">
-            HISTORIAL DE MOVIMIENTOS
-          </h1>
-        </div>
-      </div>
+    <h1 className="text-3xl font-bold text-white">
+      HISTORIAL DE MOVIMIENTOS
+    </h1>
+  </div>
+
+  <RelojMexico />
+</div>
 
       <TablaHistorial sucursalFiltro={sucursal} />
     </div>
