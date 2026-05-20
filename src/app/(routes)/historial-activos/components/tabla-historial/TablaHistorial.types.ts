@@ -1,11 +1,30 @@
 export interface Historial {
   id: number;
   activoId: number;
+
   numeroControl: string;
-  descripcion?: string;
-  tipoMovimiento: string;
-  detalle?: string;
+
+  descripcion?: string | null;
+
+  tipoMovimiento:
+    | "ALTA"
+    | "EDICION"
+    | "BAJA"
+    | "CAMBIO_STATUS"
+    | "CAMBIO_UBICACION"
+    | "TRANSFERENCIA";
+
+  detalle?: string | null;
+
   sucursal: string;
-  usuarioNombre?: string;
+
+  usuarioId?: number | null;
+
+  usuarioNombre?: string | null;
+
+  usuarioMostrado?: string | null;
+
   fecha: string;
+
+  fechaMexico?: string;
 }

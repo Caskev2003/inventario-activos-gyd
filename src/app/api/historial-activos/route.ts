@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const sucursal = searchParams.get("sucursal");
     const tipo = searchParams.get("tipo");
     const numeroControl = searchParams.get("numeroControl");
+    const buscar = searchParams.get("buscar");
 
     const where: any = {};
 
@@ -27,6 +28,31 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    if (buscar) {
+      where.OR = [
+        {
+          numeroControl: {
+            contains: buscar,
+          },
+        },
+        {
+          descripcion: {
+            contains: buscar,
+          },
+        },
+        {
+          detalle: {
+            contains: buscar,
+          },
+        },
+        {
+          usuarioNombre: {
+            contains: buscar,
+          },
+        },
+      ];
+    }
+
     const historial = await db.historial_activos.findMany({
       where,
       include: {
@@ -36,15 +62,44 @@ export async function GET(request: NextRequest) {
             nombre: true,
           },
         },
+        activo: {
+          select: {
+            id: true,
+            numeroControl: true,
+            descripcionActivo: true,
+            tipoEquipo: true,
+            existencia: true,
+            sucursal: true,
+            ubicacion: true,
+            status: true,
+          },
+        },
       },
       orderBy: {
         fecha: "desc",
       },
     });
 
-    return NextResponse.json(historial);
+    const historialFormateado = historial.map((item) => ({
+      ...item,
+      usuarioMostrado:
+        item.usuarioNombre || item.usuario?.nombre || "Usuario no identificado",
+      fechaMexico: item.fecha.toLocaleString("es-MX", {
+        timeZone: "America/Mexico_City",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }),
+    }));
+
+    return NextResponse.json(historialFormateado);
   } catch (error) {
     console.error("Error al obtener historial:", error);
+
     return NextResponse.json(
       { error: "Error al obtener historial" },
       { status: 500 }

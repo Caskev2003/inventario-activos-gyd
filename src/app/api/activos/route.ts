@@ -65,6 +65,14 @@ const TIPOS_EQUIPO_VALIDOS: TipoEquipoActivo[] = [
   "EQUIPO_TRANSPORTE",
 ];
 
+function obtenerFechaMexico(): Date {
+  return new Date(
+    new Date().toLocaleString("en-US", {
+      timeZone: "America/Mexico_City",
+    })
+  );
+}
+
 function esSucursalValida(valor: string | null): valor is Sucursal {
   return !!valor && SUCURSALES_VALIDAS.includes(valor as Sucursal);
 }
@@ -79,6 +87,25 @@ function esCondicionIngresoValida(valor: string | null): valor is CondicionIngre
 
 function esTipoEquipoValido(valor: string | null): valor is TipoEquipoActivo {
   return !!valor && TIPOS_EQUIPO_VALIDOS.includes(valor as TipoEquipoActivo);
+}
+
+function normalizarValor(valor: any): string {
+  if (valor === null || valor === undefined || valor === "") return "Sin dato";
+  return String(valor);
+}
+
+function agregarCambio(
+  cambios: string[],
+  campo: string,
+  anterior: any,
+  nuevo: any
+) {
+  const valorAnterior = normalizarValor(anterior);
+  const valorNuevo = normalizarValor(nuevo);
+
+  if (valorAnterior !== valorNuevo) {
+    cambios.push(`Actualizó ${campo}: "${valorAnterior}" → "${valorNuevo}"`);
+  }
 }
 
 async function registrarHistorial(params: {
@@ -101,6 +128,7 @@ async function registrarHistorial(params: {
       sucursal: params.sucursal,
       usuarioId: params.usuarioId ?? null,
       usuarioNombre: params.usuarioNombre ?? null,
+      fecha: obtenerFechaMexico(),
     },
   });
 }
@@ -388,6 +416,8 @@ export async function POST(request: NextRequest) {
         responsableCargo: responsableSucursal.cargo ?? null,
         creadoPorId,
         status,
+        createdAt: obtenerFechaMexico(),
+        updatedAt: obtenerFechaMexico(),
       },
       include: includeActivo,
     });
@@ -464,6 +494,15 @@ export async function PUT(request: NextRequest) {
 
     const sucursalBody = body.sucursal ? String(body.sucursal).trim() : null;
     const ubicacion = body.ubicacion ? String(body.ubicacion).trim() : null;
+
+    const usuarioMovimientoId =
+      body.usuarioId !== undefined && body.usuarioId !== null
+        ? Number(body.usuarioId)
+        : body.actualizadoPorId !== undefined && body.actualizadoPorId !== null
+        ? Number(body.actualizadoPorId)
+        : body.creadoPorId !== undefined && body.creadoPorId !== null
+        ? Number(body.creadoPorId)
+        : null;
 
     const creadoPorId =
       body.creadoPorId !== undefined && body.creadoPorId !== null
@@ -545,23 +584,16 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    let creadoPorExiste: { id: number; nombre: string } | null = null;
+    let usuarioMovimiento: { id: number; nombre: string } | null = null;
 
-    if (creadoPorId && creadoPorId > 0) {
-      creadoPorExiste = await db.usuario.findUnique({
-        where: { id: creadoPorId },
+    if (usuarioMovimientoId && usuarioMovimientoId > 0) {
+      usuarioMovimiento = await db.usuario.findUnique({
+        where: { id: usuarioMovimientoId },
         select: {
           id: true,
           nombre: true,
         },
       });
-
-      if (!creadoPorExiste) {
-        return NextResponse.json(
-          { error: "El usuario que dio de alta no existe" },
-          { status: 404 }
-        );
-      }
     }
 
     const numeroControlDuplicado = await db.activo_fijo.findFirst({
@@ -612,6 +644,37 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const cambios: string[] = [];
+
+    agregarCambio(cambios, "número de control", activoExiste.numeroControl, numeroControl);
+    agregarCambio(cambios, "descripción", activoExiste.descripcionActivo, descripcionActivo);
+    agregarCambio(cambios, "tipo de equipo", activoExiste.tipoEquipo, tipoEquipo);
+    agregarCambio(cambios, "existencia", activoExiste.existencia, existencia);
+    agregarCambio(cambios, "medidas", activoExiste.medidas, medidas);
+    agregarCambio(cambios, "modelo/marca", activoExiste.modeloMarca, modeloMarca);
+    agregarCambio(cambios, "número de serie", activoExiste.numeroSerie, numeroSerie);
+    agregarCambio(cambios, "condición", activoExiste.condicionIngreso, condicionIngreso);
+    agregarCambio(cambios, "observaciones", activoExiste.observaciones, observaciones);
+    agregarCambio(cambios, "sucursal", activoExiste.sucursal, sucursal);
+    agregarCambio(cambios, "ubicación", activoExiste.ubicacion, ubicacion);
+    agregarCambio(cambios, "status", activoExiste.status, status);
+    agregarCambio(
+      cambios,
+      "responsable",
+      activoExiste.responsableNombre,
+      responsableSucursal.nombreResponsable
+    );
+
+    if (normalizarValor(activoExiste.imagenActivo) !== normalizarValor(imagenActivo)) {
+      if (!activoExiste.imagenActivo && imagenActivo) {
+        cambios.push("Agregó imagen del activo");
+      } else if (activoExiste.imagenActivo && !imagenActivo) {
+        cambios.push("Eliminó imagen del activo");
+      } else {
+        cambios.push("Actualizó imagen del activo");
+      }
+    }
+
     const activoActualizado = await db.activo_fijo.update({
       where: { id },
       data: {
@@ -631,6 +694,7 @@ export async function PUT(request: NextRequest) {
         responsableCargo: responsableSucursal.cargo ?? null,
         creadoPorId,
         status,
+        updatedAt: obtenerFechaMexico(),
       },
       include: includeActivo,
     });
@@ -640,10 +704,14 @@ export async function PUT(request: NextRequest) {
       numeroControl: activoActualizado.numeroControl,
       descripcion: activoActualizado.descripcionActivo,
       tipoMovimiento: "EDICION",
-      detalle: "Se editó el activo",
+      detalle:
+        cambios.length > 0
+          ? cambios.join(" | ")
+          : "Se abrió la edición, pero no se detectaron cambios en los datos",
       sucursal: activoActualizado.sucursal as Sucursal,
-      usuarioId: creadoPorId ?? null,
-      usuarioNombre: creadoPorExiste?.nombre ?? null,
+      usuarioId: usuarioMovimiento?.id ?? activoActualizado.creadoPorId ?? null,
+      usuarioNombre:
+        usuarioMovimiento?.nombre ?? activoActualizado.creadoPor?.nombre ?? null,
     });
 
     return NextResponse.json({
@@ -669,6 +737,13 @@ export async function PATCH(request: NextRequest) {
 
     const id = Number(body.id);
     const statusBody = body.status ? String(body.status).trim() : null;
+
+    const usuarioMovimientoId =
+      body.usuarioId !== undefined && body.usuarioId !== null
+        ? Number(body.usuarioId)
+        : body.actualizadoPorId !== undefined && body.actualizadoPorId !== null
+        ? Number(body.actualizadoPorId)
+        : null;
 
     if (isNaN(id) || id < 1) {
       return NextResponse.json(
@@ -696,10 +771,23 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    let usuarioMovimiento: { id: number; nombre: string } | null = null;
+
+    if (usuarioMovimientoId && usuarioMovimientoId > 0) {
+      usuarioMovimiento = await db.usuario.findUnique({
+        where: { id: usuarioMovimientoId },
+        select: {
+          id: true,
+          nombre: true,
+        },
+      });
+    }
+
     const activoActualizado = await db.activo_fijo.update({
       where: { id },
       data: {
         status: statusBody,
+        updatedAt: obtenerFechaMexico(),
       },
       include: includeActivo,
     });
@@ -709,10 +797,11 @@ export async function PATCH(request: NextRequest) {
       numeroControl: activoActualizado.numeroControl,
       descripcion: activoActualizado.descripcionActivo,
       tipoMovimiento: "CAMBIO_STATUS",
-      detalle: `Se cambió el status del activo de ${activoExiste.status} a ${activoActualizado.status}`,
+      detalle: `Actualizó status: "${activoExiste.status}" → "${activoActualizado.status}"`,
       sucursal: activoActualizado.sucursal as Sucursal,
-      usuarioId: activoActualizado.creadoPorId ?? null,
-      usuarioNombre: activoActualizado.creadoPor?.nombre ?? null,
+      usuarioId: usuarioMovimiento?.id ?? activoActualizado.creadoPorId ?? null,
+      usuarioNombre:
+        usuarioMovimiento?.nombre ?? activoActualizado.creadoPor?.nombre ?? null,
     });
 
     return NextResponse.json({
@@ -738,6 +827,7 @@ export async function DELETE(request: NextRequest) {
 
     const idParam = searchParams.get("id");
     const sucursalParam = searchParams.get("sucursal");
+    const usuarioIdParam = searchParams.get("usuarioId");
 
     if (!idParam) {
       return NextResponse.json(
@@ -747,6 +837,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const id = Number(idParam);
+    const usuarioMovimientoId = usuarioIdParam ? Number(usuarioIdParam) : null;
 
     if (isNaN(id) || id < 1) {
       return NextResponse.json(
@@ -787,10 +878,23 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    let usuarioMovimiento: { id: number; nombre: string } | null = null;
+
+    if (usuarioMovimientoId && usuarioMovimientoId > 0) {
+      usuarioMovimiento = await db.usuario.findUnique({
+        where: { id: usuarioMovimientoId },
+        select: {
+          id: true,
+          nombre: true,
+        },
+      });
+    }
+
     const activoDadoDeBaja = await db.activo_fijo.update({
       where: { id },
       data: {
         status: "BAJA",
+        updatedAt: obtenerFechaMexico(),
       },
       include: includeActivo,
     });
@@ -808,8 +912,9 @@ export async function DELETE(request: NextRequest) {
           : ""
       }`,
       sucursal: activoDadoDeBaja.sucursal as Sucursal,
-      usuarioId: activoDadoDeBaja.creadoPorId ?? null,
-      usuarioNombre: activoDadoDeBaja.creadoPor?.nombre ?? null,
+      usuarioId: usuarioMovimiento?.id ?? activoDadoDeBaja.creadoPorId ?? null,
+      usuarioNombre:
+        usuarioMovimiento?.nombre ?? activoDadoDeBaja.creadoPor?.nombre ?? null,
     });
 
     return NextResponse.json({
